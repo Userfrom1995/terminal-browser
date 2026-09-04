@@ -1,0 +1,142 @@
+import fs from "node:fs";
+import path from "node:path";
+
+import { app, ipcMain } from "electron";
+import type { IpcMainEvent, Session } from "electron";
+
+import { browserSession, configureBrowserSession, persistentPartition } from "./browser-session";
+import type { PageHost } from "./host";
+
+export interface TerminalTheme {
+  background: number[];
+  foreground: number[];
+  ansi: (number[] | null)[];
+}
+
+export const THEME_CHANNEL = "terminal-electron:theme";
+export const THEME_REQUEST_CHANNEL = "terminal-electron:theme-request";
+export const QUIT_CHANNEL = "terminal-electron:quit";
+
+// Written to disk at runtime rather than shipped as a file so bundling the
+// library into an app keeps working.
+const API_PRELOAD_SOURCE = `if (process.isMainFrame) {
+  const { ipcRenderer } = require("electron");
+  let current = null;
+  const subscribers = new Set();
+  ipcRenderer.on("terminal-electron:theme", (_event, theme) => {
+    current = theme;
+    for (const subscriber of subscribers) {
+      try { subscriber(theme); } catch {}
+    }
+  });
+  ipcRenderer.send("terminal-electron:theme-request");
+  globalThis.terminalElectron = {
+    theme: () => current,
+    onTheme(subscriber) {
+      subscribers.add(subscriber);
+      if (current) { try { subscriber(current); } catch {} }
+      return () => subscribers.delete(subscriber);
+    },
+    quit: () => ipcRenderer.send("terminal-electron:quit"),
+  };
+}
+`;
+
+let apiPreloadFile: string | null = null;
+function apiPreloadPath(): string {
+  if (!apiPreloadFile) {
+    apiPreloadFile = path.join(app.getPath("userData"), "terminal-electron-api-preload.js");
+    fs.writeFileSync(apiPreloadFile, API_PRELOAD_SOURCE);
+  }
+  return apiPreloadFile;
+}
+
+const partitionPreloads = new Map<string, string | null>();
+const registeredPreloads = new WeakMap<Session, Set<string>>();
+
+function registerPreloadOnce(ses: Session, filePath: string) {
+  let seen = registeredPreloads.get(ses);
+  if (!seen) registeredPreloads.set(ses, (seen = new Set()));
+  if (seen.has(filePath)) return;
+  seen.add(filePath);
+  ses.registerPreloadScript({ type: "frame", filePath });
+}
+
+// Preload scripts register on the whole session, so two views on one partition
+// with different preloads would both run both. Refuse the second one instead.
+export function claimPartition(partition: string | null, preload: string | null): string | null {
+  const normalized = partition ? persistentPartition(partition) : null;
+  const key = normalized ?? "";
+  const existing = partitionPreloads.get(key);
+  if (existing !== undefined && existing !== preload) {
+    throw new Error(
+      `[placeholder copy: partition ${normalized ?? "(default)"} already runs a different preload (${existing ?? "none"}); give this WebView its own partition]`,
+    );
+  }
+  partitionPreloads.set(key, preload);
+  const ses = configureBrowserSession(normalized);
+  registerPreloadOnce(ses, apiPreloadPath());
+  if (preload) registerPreloadOnce(ses, preload);
+  return normalized;
+}
+
+export function flushPartitions(): void {
+  for (const key of partitionPreloads.keys()) {
+    try {
+      browserSession(key || null).flushStorageData();
+    } catch {}
+  }
+}
+
+export interface EmbedderHost {
+  hosts(): Iterable<PageHost>;
+  theme(): TerminalTheme | null;
+  quit(host: PageHost): void;
+}
+
+// One process can run several roots (one per terminal pane), so the ipc
+// handlers are installed once and find the root that owns the sending page.
+const embedders = new Set<EmbedderHost>();
+
+function ownerOf(event: IpcMainEvent): { embedder: EmbedderHost; host: PageHost } | null {
+  if (event.senderFrame !== event.sender.mainFrame) return null;
+  for (const embedder of embedders) {
+    for (const host of embedder.hosts()) {
+      if (host.hasContents(event.sender.id)) return { embedder, host };
+    }
+  }
+  return null;
+}
+
+function onThemeRequest(event: IpcMainEvent) {
+  const owner = ownerOf(event);
+  if (!owner) return;
+  const payload = owner.embedder.theme();
+  if (payload) event.sender.send(THEME_CHANNEL, payload);
+}
+
+function onQuitRequest(event: IpcMainEvent) {
+  const owner = ownerOf(event);
+  if (owner) owner.embedder.quit(owner.host);
+}
+
+export function installEmbedderApi(target: EmbedderHost): void {
+  if (embedders.size === 0) {
+    ipcMain.on(THEME_REQUEST_CHANNEL, onThemeRequest);
+    ipcMain.on(QUIT_CHANNEL, onQuitRequest);
+  }
+  embedders.add(target);
+}
+
+export function uninstallEmbedderApi(target: EmbedderHost): void {
+  embedders.delete(target);
+  if (embedders.size === 0) {
+    ipcMain.removeListener(THEME_REQUEST_CHANNEL, onThemeRequest);
+    ipcMain.removeListener(QUIT_CHANNEL, onQuitRequest);
+  }
+}
+
+export function broadcastTheme(target: EmbedderHost, theme: TerminalTheme | null): void {
+  if (!theme) return;
+  for (const host of target.hosts()) host.sendToPage(THEME_CHANNEL, theme);
+}

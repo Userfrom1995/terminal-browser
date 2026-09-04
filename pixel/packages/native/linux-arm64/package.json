@@ -1,0 +1,9 @@
+{
+  "name": "@terminal-electron/native-linux-arm64",
+  "version": "0.1.0",
+  "description": "[placeholder copy: prebuilt engine binary for terminal-electron on linux-arm64]",
+  "license": "MIT",
+  "os": ["linux"],
+  "cpu": ["arm64"],
+  "files": ["pixel.node", "native-scroll-helper"]
+}

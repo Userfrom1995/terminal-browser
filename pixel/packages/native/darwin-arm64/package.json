@@ -1,0 +1,9 @@
+{
+  "name": "@terminal-electron/native-darwin-arm64",
+  "version": "0.1.0",
+  "description": "[placeholder copy: prebuilt engine binary for terminal-electron on darwin-arm64]",
+  "license": "MIT",
+  "os": ["darwin"],
+  "cpu": ["arm64"],
+  "files": ["pixel.node", "native-scroll-helper"]
+}

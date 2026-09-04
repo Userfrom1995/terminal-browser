@@ -1,0 +1,23 @@
+# Cargo build artifacts
+/engine/target/
+**/*.rs.bk
+*.profraw
+*.profdata
+*.snap.new
+*.pending-snap
+
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+.env
+.env.*
+
+node_modules/
+dist/
+packages/native/*/pixel.node
+packages/native/*/native-scroll-helper
+.claude/worktrees/
