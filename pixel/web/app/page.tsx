@@ -4,17 +4,6 @@ import { GithubMark } from "./components/icons";
 
 const GITHUB = "https://github.com/zenbu-labs/terminal-electron";
 
-function Feature({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="mt-14">
-      <h2 className="text-[16px] font-semibold tracking-[-0.01em] text-text">
-        {title}
-      </h2>
-      <p className="mt-3 text-[14px] leading-[1.75] text-muted">{children}</p>
-    </section>
-  );
-}
-
 export default function Home() {
   return (
     <main className="relative z-10 mx-auto w-full max-w-[680px] flex-1 px-6 pt-24 pb-16 sm:pt-32">
@@ -49,32 +38,14 @@ export default function Home() {
         </a>
       </div>
 
-      <div className="mt-12">
-        <Feature title="[placeholder copy: Your Electron app, in a pane]">
-          [placeholder copy: Replace the BrowserWindow with a WebView component
-          and the page draws into the terminal pane you launched it from. The
-          renderer, preload scripts and ipc handlers do not change.]
-        </Feature>
+      <p className="mt-14 text-[14px] leading-[1.75] text-muted">
+        [placeholder copy: Replace the BrowserWindow with a WebView component
+        and your page draws into the terminal pane you launched it from, next
+        to your coding agent. The renderer, preload scripts and ipc handlers do
+        not change. Devtools dock inside the view on right click.]
+      </p>
 
-        <Feature title="[placeholder copy: React all the way down]">
-          [placeholder copy: The app root is a React tree with flexbox layout.
-          Put several WebViews side by side, drive them through refs, and mix
-          in your own Boxes and Text like any other UI.]
-        </Feature>
-
-        <Feature title="[placeholder copy: Devtools included]">
-          [placeholder copy: Right click, Inspect. Chromium devtools dock
-          inside the view with a draggable divider, with nothing to configure.]
-        </Feature>
-
-        <Feature title="[placeholder copy: Runs where your agent runs]">
-          [placeholder copy: Coding agents live in the terminal. An app built
-          on terminal-electron opens in a split next to them, in Ghostty, kitty
-          or WezTerm, over ssh, inside tmux.]
-        </Feature>
-      </div>
-
-      <div className="mt-16 flex items-center gap-3">
+      <div className="mt-12 flex items-center gap-3">
         <a
           href={GITHUB}
           target="_blank"

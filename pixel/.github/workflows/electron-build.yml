@@ -1,0 +1,173 @@
+name: electron build
+run-name: "build patched electron v${{ inputs.version }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Electron version to build (e.g. 43.3.0)"
+        required: true
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: electron-build-${{ inputs.version }}
+  cancel-in-progress: false
+
+# Releases are tagged electron-v<version> so they never collide with this
+# package's own v<version> tags.
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: darwin-arm64
+            runner: ${{ vars.MACOS_BUILD_RUNNER || 'depot-macos-26' }}
+          - platform: darwin-x64
+            runner: ${{ vars.MACOS_BUILD_RUNNER || 'depot-macos-26' }}
+          - platform: linux-x64
+            runner: ${{ vars.LINUX_BUILD_RUNNER || 'depot-ubuntu-24.04-16' }}
+          - platform: linux-arm64
+            runner: ${{ vars.LINUX_BUILD_RUNNER || 'depot-ubuntu-24.04-16' }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 600
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build patched electron
+        run: |
+          set -euo pipefail
+          sudo xcode-select -p 2>/dev/null || true
+          export ELECTRON_BUILD_DIR="$RUNNER_TEMP/electron-build"
+          bash electron/scripts/build.sh "${{ inputs.version }}" \
+            "$RUNNER_TEMP/out" "${{ matrix.platform }}"
+          mv "$RUNNER_TEMP/out/SHASUMS256.txt" \
+            "$RUNNER_TEMP/out/sha-${{ matrix.platform }}.txt"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: electron-asset-${{ matrix.platform }}
+          path: |
+            ${{ runner.temp }}/out/electron-v${{ inputs.version }}-${{ matrix.platform }}.zip
+            ${{ runner.temp }}/out/sha-${{ matrix.platform }}.txt
+          if-no-files-found: error
+
+      - name: Report failure loudly
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${{ inputs.version }}"
+          platform="${{ matrix.platform }}"
+          title="🚨 Build failed: electron v$version ($platform)"
+          existing=$(gh issue list -R "$GITHUB_REPOSITORY" --state open --search "in:title \"$title\"" --json number --jq length)
+          if [ "$existing" = "0" ]; then
+            gh issue create -R "$GITHUB_REPOSITORY" --title "$title" --body "Build of patched electron v$version for $platform failed, so the electron-v$version release is missing its $platform asset.
+
+          Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+
+          While this issue is open, the sync workflow will not retry this version. Fix the cause (or re-run the workflow manually), then close this issue to re-enable automatic builds."
+          fi
+
+  publish:
+    # single writer for the release and SHASUMS256.txt: the build legs run in
+    # parallel and never touch the release themselves
+    needs: build
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: electron-asset-*
+          merge-multiple: true
+          path: out
+
+      - name: Publish whatever built
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${{ inputs.version }}"
+          tag="electron-v$version"
+          cd out
+          ls *.zip >/dev/null
+          cat sha-*.txt > new.txt
+          notes="Patched Electron v$version for terminal-electron.
+
+          Patches (source of truth: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/main/electron/patches):
+          - macOS: offscreen-rendering compositors ride a real display link, so page frame rates follow \`webContents.setFrameRate\` instead of being clamped to 60fps on input.
+          - Linux: offscreen frames can be delivered through shared memory, and offscreen views keep their requested \`deviceScaleFactor\` on native Wayland instead of having it clobbered to 1.0.
+
+          Upstream release: https://github.com/electron/electron/releases/tag/v$version"
+          if ! gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$tag" -R "$GITHUB_REPOSITORY" \
+              --title "electron v$version (patched)" --notes "$notes"
+          fi
+          gh release download "$tag" -R "$GITHUB_REPOSITORY" \
+            --pattern "SHASUMS256.txt" || touch SHASUMS256.txt
+          # keep existing entries for platforms this run did not rebuild
+          while read -r _ starred; do
+            grep -v "${starred#\*}" SHASUMS256.txt > kept.txt || true
+            mv kept.txt SHASUMS256.txt
+          done < new.txt
+          cat new.txt >> SHASUMS256.txt
+          gh release upload "$tag" -R "$GITHUB_REPOSITORY" --clobber \
+            *.zip SHASUMS256.txt
+
+      - name: Report failure loudly
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${{ inputs.version }}"
+          title="🚨 Publish failed: electron v$version"
+          existing=$(gh issue list -R "$GITHUB_REPOSITORY" --state open --search "in:title \"$title\"" --json number --jq length)
+          if [ "$existing" = "0" ]; then
+            gh issue create -R "$GITHUB_REPOSITORY" --title "$title" --body "Publishing the built assets for electron v$version failed, so the electron-v$version release is missing assets that were successfully built.
+
+          Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+
+          While this issue is open, the sync workflow will not retry this version. Fix the cause (or re-run the workflow manually), then close this issue to re-enable automatic builds."
+          fi
+
+  verify-manifest:
+    needs: publish
+    if: ${{ !cancelled() && needs.publish.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Every published zip has a manifest entry
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="electron-v${{ inputs.version }}"
+          gh release download "$tag" -R "$GITHUB_REPOSITORY" --pattern "SHASUMS256.txt"
+          missing=""
+          for zip in $(gh release view "$tag" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep '\.zip$'); do
+            grep -q "\*$zip" SHASUMS256.txt || missing="$missing $zip"
+          done
+          if [ -n "$missing" ]; then
+            echo "SHASUMS256.txt missing entries:$missing" >&2
+            exit 1
+          fi
+
+      - name: Report failure loudly
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${{ inputs.version }}"
+          title="🚨 SHASUMS256.txt incomplete: electron v$version"
+          existing=$(gh issue list -R "$GITHUB_REPOSITORY" --state open --search "in:title \"$title\"" --json number --jq length)
+          if [ "$existing" = "0" ]; then
+            gh issue create -R "$GITHUB_REPOSITORY" --title "$title" --body "The electron-v$version release has zip assets with no entry in SHASUMS256.txt, so installs of those platforms will fail the checksum lookup.
+
+          Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+
+          The run's log lists the missing entries. Re-run the workflow (or fix SHASUMS256.txt by hand), then close this issue."
+          fi

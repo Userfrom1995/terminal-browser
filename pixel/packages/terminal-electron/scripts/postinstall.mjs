@@ -38,7 +38,7 @@ if (!platform) {
 
 const mirror =
   process.env.TERMINAL_ELECTRON_ELECTRON_MIRROR ??
-  `https://github.com/zenbu-labs/electron-releases/releases/download/v${version}`;
+  `https://github.com/zenbu-labs/terminal-electron/releases/download/electron-v${version}`;
 const zipName = `electron-v${version}-${platform}.zip`;
 const marker = path.join(dest, ".zenbu-electron-sha256");
 
