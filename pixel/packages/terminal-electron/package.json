@@ -3,6 +3,11 @@
   "version": "0.0.2",
   "description": "[placeholder copy: Electron apps that render into your terminal pane]",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zenbu-labs/terminal-electron.git",
+    "directory": "packages/terminal-electron"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
