@@ -1,3 +1,4 @@
+/// <reference path="../electron/electron.d.ts" preserve="true" />
 export { createRoot } from "./root";
 export type { Root, RootOptions } from "./root";
 export type { Instance } from "./instances";
@@ -6,6 +7,8 @@ export { WebView } from "./webview";
 export type {
   DownloadProgress,
   OpenWindowDecision,
+  OpenWindowPolicy,
+  BrowserWindowOptions,
   WebViewHandle,
   WebViewProps,
   WebViewRecording,
@@ -16,7 +19,7 @@ export type { DevToolsProps } from "./devtools";
 export type { DevtoolsDock } from "./web/types";
 export type { ZoomDirection } from "./web/zoom";
 export type { TerminalTheme } from "./web/session";
-export { QUIT_URL } from "./web/host";
+export { QUIT_URL, defaultOpenWindow } from "./web/host";
 
 export {
   Box,

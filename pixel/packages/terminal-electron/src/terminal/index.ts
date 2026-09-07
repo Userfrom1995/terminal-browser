@@ -1,3 +1,4 @@
+/// <reference path="../../electron/electron.d.ts" preserve="true" />
 export type { Detect, Direction, ListPanesOptions, Pane, PaneContext, PaneDetails, SplitRequest, Terminal } from "./terminal";
 export { canSplit } from "./terminal";
 export type { Run } from "./run";

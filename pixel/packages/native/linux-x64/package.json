@@ -1,9 +1,16 @@
 {
-  "name": "@terminal-electron/native-linux-x64",
-  "version": "0.1.0",
+  "name": "terminal-electron-native-linux-x64",
+  "version": "0.0.2",
   "description": "[placeholder copy: prebuilt engine binary for terminal-electron on linux-x64]",
   "license": "MIT",
-  "os": ["linux"],
-  "cpu": ["x64"],
-  "files": ["pixel.node", "native-scroll-helper"]
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "pixel.node",
+    "native-scroll-helper"
+  ]
 }

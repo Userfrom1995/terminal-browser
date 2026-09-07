@@ -22,7 +22,7 @@ import { detect } from "./terminal";
 import { initOffscreenMode } from "./web/offscreen";
 import {
   broadcastTheme,
-  flushPartitions,
+  flushSessions,
   installEmbedderApi,
   uninstallEmbedderApi,
 } from "./web/session";
@@ -135,7 +135,7 @@ export function createRoot(options: RootOptions = {}): Root {
         } catch {}
       }
     }
-    flushPartitions();
+    flushSessions();
     try {
       engineRoot.setPointerShape("text");
     } catch {}

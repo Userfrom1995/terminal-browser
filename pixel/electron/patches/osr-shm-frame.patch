@@ -616,3 +616,65 @@ index 487f87d..9651f98 100644
  inline constexpr std::string_view kSharedTexturePixelFormat =
      "sharedTexturePixelFormat";
  
+diff --git a/docs/api/structures/offscreen-software-frame.md b/docs/api/structures/offscreen-software-frame.md
+new file mode 100644
+index 0000000..2895edc
+--- /dev/null
++++ b/docs/api/structures/offscreen-software-frame.md
+@@ -0,0 +1,20 @@
++# OffscreenSoftwareFrame Object
++
++* `frameInfo` Object - The shared memory frame info.
++  * `widgetType` string - The widget type of the frame. Can be `popup` or `frame`.
++  * `pixelFormat` string - The pixel format of the frame.
++    * `rgba` - The frame format is 8-bit unorm RGBA.
++    * `bgra` - The frame format is 8-bit unorm BGRA.
++    * `rgbaf16` - The frame format is 16-bit float RGBA.
++  * `codedSize` [Size](size.md) - The full dimensions of the video frame.
++  * `contentRect` [Rectangle](rectangle.md) - The region of the video frame that capturer would like to populate. In OSR case, it is the same with `dirtyRect` that needs to be painted.
++  * `stride` number - The number of bytes between the starts of two consecutive rows in the shared memory.
++  * `dataSize` number - The number of bytes of pixel data in the shared memory region.
++  * `timestamp` number - The time in microseconds since the capture start.
++  * `metadata` Object - Extra metadata. See comments in src\media\base\video_frame_metadata.h for accurate details.
++    * `captureUpdateRect` [Rectangle](rectangle.md) (optional) - Updated area of frame, can be considered as the `dirty` area.
++    * `sourceSize` [Rectangle](rectangle.md) (optional) - Full size of the source frame.
++    * `frameCount` number (optional) - The increasing count of captured frame. May contain gaps if frames are dropped between two consecutively received frames.
++  * `fd` Integer _Linux_ - A file descriptor over the shared memory region holding the pixels, valid until `release()` is called.
++* `release` Function - Release the resources. The `softwareFrame` cannot be directly passed to another process, users need to maintain frame lifecycles in
++  main process. Only a limited number of frames can exist at the same time, so it's important that you call `softwareFrame.release()` as soon as you're done with the frame.
+diff --git a/docs/api/structures/web-preferences.md b/docs/api/structures/web-preferences.md
+index b6ebb6f..480c8b0 100644
+--- a/docs/api/structures/web-preferences.md
++++ b/docs/api/structures/web-preferences.md
+@@ -96,6 +96,10 @@
+     * `rgbaf16` - The requested output texture format is 16-bit float RGBA, with scRGB HDR color space.
+     * `nv12` - The requested output texture format is 12bpp with Y plane followed by a 2x2 interleaved UV plane, with REC709 color space.
+   * `deviceScaleFactor` number (optional) _Experimental_ - The device scale factor of the offscreen rendering output. If not set, will use `1` as default.
++  * `useSharedMemory` boolean (optional) _Experimental_ - Whether to deliver software rendered frames as shared memory
++    instead of copying them into a [`NativeImage`](../native-image.md). Each `paint` event then carries an
++    [`OffscreenSoftwareFrame`](../structures/offscreen-software-frame.md) whose memory maps the frame directly. Linux only.
++    Defaults to `false`.
+ * `contextIsolation` boolean (optional) - Whether to run Electron APIs and
+   the specified `preload` script in a separate JavaScript context. Defaults
+   to `true`. The context that the `preload` script runs in will only have
+diff --git a/docs/api/web-contents.md b/docs/api/web-contents.md
+index 1c19cda..06db5dd 100644
+--- a/docs/api/web-contents.md
++++ b/docs/api/web-contents.md
+@@ -925,6 +925,7 @@ Returns:
+ 
+ * `details` Event\<\>
+   * `texture` [OffscreenSharedTexture](structures/offscreen-shared-texture.md) (optional) _Experimental_ - The GPU shared texture of the frame, when `webPreferences.offscreen.useSharedTexture` is `true`.
++  * `softwareFrame` [OffscreenSoftwareFrame](structures/offscreen-software-frame.md) (optional) _Experimental_ - The shared memory frame, when `webPreferences.offscreen.useSharedMemory` is `true`.
+ * `dirtyRect` [Rectangle](structures/rectangle.md)
+ * `image` [NativeImage](native-image.md) - The image data of the whole frame.
+ 
+@@ -948,6 +949,8 @@ By managing the texture lifecycle by yourself, you can safely pass the `texture.
+ 
+ More details can be found in the [offscreen rendering tutorial](../tutorial/offscreen-rendering.md). To learn about how to handle the texture in native code, refer to [offscreen rendering's code documentation.](../../shell/browser/osr/README.md).
+ 
++When using shared memory (set `webPreferences.offscreen.useSharedMemory` to `true`, Linux only), the software rendered frame is exposed through `softwareFrame` as a file descriptor over the shared memory region that holds the pixels, together with its geometry, so it can be mapped by native code without a copy. `image` still carries the frame. Only a limited number of frames can exist at the same time, so call `softwareFrame.release()` as soon as you are done with it.
++
+ ```js
+ const { BrowserWindow } = require('electron')
+ 

@@ -44,7 +44,7 @@ terminal-electron dist/main.js -- --verbose https://example.com
           ["TERMINAL_ELECTRON_FPS", "Cap the frame rate pages are painted at."],
           ["TERMINAL_ELECTRON_DISABLE_GPU=1", "Run Chromium without GPU acceleration."],
           ["TERMINAL_ELECTRON_SHM=0", "On Linux, stop using shared memory for frames and copy them instead."],
-          ["TERMINAL_ELECTRON_SKIP_DOWNLOAD=1", "At install time, do not download Electron. For building from source."],
+          ["TERMINAL_ELECTRON_SKIP_DOWNLOAD=1", "At install time, fetch only the type declarations, not the Electron build. For building from source."],
           ["TERMINAL_ELECTRON_ELECTRON_MIRROR", "At install time, a different URL to download the patched Electron from."],
         ]}
       />
@@ -54,8 +54,8 @@ terminal-electron dist/main.js -- --verbose https://example.com
         rows={[
           ["~/.local/state/terminal-electron/logs/<app>.stderr.log", "Everything your app and Chromium print to stderr. Look here first when something goes wrong. Respects XDG_STATE_HOME."],
           ["~/.local/state/terminal-electron/instances/", "One small file and one socket for each running app that owns a pane. This is how apps find each other."],
-          ["node_modules/electron/dist", "The patched Electron that the install downloaded, with a checksum file next to it."],
-          ["node_modules/@terminal-electron/native-<platform>", "The rendering engine for your platform and, on macOS, the trackpad scroll helper."],
+          ["node_modules/terminal-electron/electron/", "The patched Electron build in dist/, with a checksum file next to it, and the electron.d.ts generated for it. Zips are cached in ~/.cache/terminal-electron so reinstalls do not download again."],
+          ["node_modules/terminal-electron-native-<platform>", "The rendering engine for your platform and, on macOS, the trackpad scroll helper."],
         ]}
       />
 

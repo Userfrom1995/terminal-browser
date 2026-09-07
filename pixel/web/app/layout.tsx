@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
-import Footer from "./footer";
 import "./globals.css";
 
 const mono = Geist_Mono({ variable: "--font-mono-face", subsets: ["latin"] });
@@ -29,7 +28,6 @@ export default function RootLayout({
       <body className="relative flex min-h-full flex-col">
         <div className="glow" aria-hidden />
         {children}
-        <Footer />
         <Analytics />
       </body>
     </html>

@@ -40,10 +40,12 @@ export default function GettingStarted() {
         <Install />
       </div>
       <P>
-        The install downloads two things you would not get from the regular <InlineCode>electron</InlineCode> package
-        on npm: a build of Electron with a handful of patches that let it hand rendered frames to the terminal without
-        copying them, and a native rendering engine for your platform. The download is around 130 MB on macOS. Nothing
-        else on your system is touched.
+        Do not add <InlineCode>electron</InlineCode> to your dependencies. The install fetches a build of Electron with
+        a handful of patches that let it hand rendered frames to the terminal without copying them, the type
+        declarations generated for that exact build, and a native rendering engine for your platform. Your code still
+        writes <InlineCode>import {"{ app }"} from &quot;electron&quot;</InlineCode> as in any Electron app; inside the
+        process that module is built in, and the types come with terminal-electron. The download is around 130 MB on
+        macOS. Nothing else on your system is touched.
       </P>
 
       <H2 id="hello">Your first app</H2>

@@ -2,7 +2,8 @@
 #
 # Produces in <output dir>:
 #   electron-v<version>-<platform>.zip   (official asset naming)
-#   SHASUMS256.txt                       (this platform's asset only)
+#   electron.d.ts                        (types generated from the patched docs)
+#   SHASUMS256.txt                       (this platform's assets only)
 #
 # Environment:
 #   ELECTRON_BUILD_DIR  work dir for depot_tools + checkout (default ~/.terminal-electron-build)
@@ -80,6 +81,14 @@ for patch in "$REPO_DIR"/patches/*.patch; do
   git apply "$patch"
 done
 
+echo "== typescript definitions =="
+# electron generates its types from docs/api, so the patched docs yield types
+# that describe the patched binary; the checkout's yarn install already ran
+# as a gclient hook
+node script/create-api-json.mjs
+node node_modules/.bin/electron-typescript-definitions --api=electron-api.json --outDir=.
+cp electron.d.ts "$OUT_DIR/electron.d.ts"
+
 echo "== gn gen =="
 cd "$WORK/electron/src"
 # //electron/BUILD.gn lists .git/packed-refs as a gn input; a no-history
@@ -119,9 +128,9 @@ ASSET="electron-v$VERSION-$PLATFORM.zip"
 cp "$BUILD/dist.zip" "$OUT_DIR/$ASSET"
 cd "$OUT_DIR"
 if command -v sha256sum >/dev/null; then
-  sha256sum "$ASSET" | awk '{print $1 " *" $2}' > SHASUMS256.txt
+  sha256sum "$ASSET" electron.d.ts | awk '{print $1 " *" $2}' > SHASUMS256.txt
 else
-  shasum -a 256 "$ASSET" | awk '{print $1 " *" $2}' > SHASUMS256.txt
+  shasum -a 256 "$ASSET" electron.d.ts | awk '{print $1 " *" $2}' > SHASUMS256.txt
 fi
 
 echo "== artifacts =="

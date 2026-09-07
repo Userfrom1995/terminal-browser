@@ -4,7 +4,7 @@ import path from "node:path";
 import { app, ipcMain } from "electron";
 import type { IpcMainEvent, Session } from "electron";
 
-import { browserSession, configureBrowserSession, persistentPartition } from "./browser-session";
+import { configureBrowserSession } from "./browser-session";
 import type { PageHost } from "./host";
 
 export interface TerminalTheme {
@@ -51,39 +51,19 @@ function apiPreloadPath(): string {
   return apiPreloadFile;
 }
 
-const partitionPreloads = new Map<string, string | null>();
-const registeredPreloads = new WeakMap<Session, Set<string>>();
+const prepared = new Set<Session>();
 
-function registerPreloadOnce(ses: Session, filePath: string) {
-  let seen = registeredPreloads.get(ses);
-  if (!seen) registeredPreloads.set(ses, (seen = new Set()));
-  if (seen.has(filePath)) return;
-  seen.add(filePath);
-  ses.registerPreloadScript({ type: "frame", filePath });
+export function prepareSession(ses: Session): void {
+  if (prepared.has(ses)) return;
+  prepared.add(ses);
+  configureBrowserSession(ses);
+  ses.registerPreloadScript({ type: "frame", filePath: apiPreloadPath() });
 }
 
-// Preload scripts register on the whole session, so two views on one partition
-// with different preloads would both run both. Refuse the second one instead.
-export function claimPartition(partition: string | null, preload: string | null): string | null {
-  const normalized = partition ? persistentPartition(partition) : null;
-  const key = normalized ?? "";
-  const existing = partitionPreloads.get(key);
-  if (existing !== undefined && existing !== preload) {
-    throw new Error(
-      `[placeholder copy: partition ${normalized ?? "(default)"} already runs a different preload (${existing ?? "none"}); give this WebView its own partition]`,
-    );
-  }
-  partitionPreloads.set(key, preload);
-  const ses = configureBrowserSession(normalized);
-  registerPreloadOnce(ses, apiPreloadPath());
-  if (preload) registerPreloadOnce(ses, preload);
-  return normalized;
-}
-
-export function flushPartitions(): void {
-  for (const key of partitionPreloads.keys()) {
+export function flushSessions(): void {
+  for (const ses of prepared) {
     try {
-      browserSession(key || null).flushStorageData();
+      ses.flushStorageData();
     } catch {}
   }
 }

@@ -132,7 +132,7 @@ export interface DiffRow {
   count?: number;
 }
 
-const NATIVE_PACKAGE = `@terminal-electron/native-${process.platform}-${process.arch}`;
+const NATIVE_PACKAGE = `terminal-electron-native-${process.platform}-${process.arch}`;
 
 function loadBinding(): unknown {
   try {

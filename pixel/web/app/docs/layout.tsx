@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Footer from "../footer";
 import Nav from "./nav";
 
 export const metadata: Metadata = {
@@ -8,19 +9,24 @@ export const metadata: Metadata = {
 
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative z-10 mx-auto w-full max-w-[1040px] flex-1 px-6 pt-10 pb-24">
-      <div className="mb-10 flex items-center gap-4 text-[13.5px]">
-        <Link href="/" className="font-semibold text-text">
-          terminal-electron
-        </Link>
-        <span className="text-faint">/</span>
-        <span className="text-muted">docs</span>
-      </div>
-      <div className="flex gap-10 md:gap-14">
-        <aside className="sticky top-10 w-[170px] shrink-0 self-start md:w-[220px]">
-          <Nav />
-        </aside>
-        <article className="min-w-0 max-w-[680px] flex-1">{children}</article>
+    <div className="fixed inset-0 z-10 flex flex-col">
+      <div className="mx-auto flex h-full w-full max-w-[1040px] flex-col px-6 pt-10">
+        <div className="mb-10 flex items-center gap-4 text-[13.5px]">
+          <Link href="/" className="font-semibold text-text">
+            terminal-electron
+          </Link>
+          <span className="text-faint">/</span>
+          <span className="text-muted">docs</span>
+        </div>
+        <div className="flex min-h-0 flex-1 gap-10 md:gap-14">
+          <aside className="w-[170px] shrink-0 md:w-[220px]">
+            <Nav />
+          </aside>
+          <div className="min-w-0 flex-1 overflow-y-auto">
+            <article className="max-w-[680px] pb-24">{children}</article>
+            <Footer />
+          </div>
+        </div>
       </div>
     </div>
   );

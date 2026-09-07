@@ -48,8 +48,7 @@ function appDir(entry: string): string {
 }
 
 function electronBinary(): string {
-  const manifest = require.resolve("electron/package.json");
-  const dist = path.join(path.dirname(manifest), "dist");
+  const dist = path.resolve(__dirname, "..", "electron", "dist");
   if (!fs.existsSync(path.join(dist, ".zenbu-electron-sha256"))) {
     fail(
       "[placeholder copy: the patched electron build is not installed. Run `node node_modules/terminal-electron/scripts/postinstall.mjs` (npm normally runs it for you on install).]",

@@ -1,11 +1,13 @@
 import Faq from "./components/faq";
 import Install from "./components/install";
 import { GithubMark } from "./components/icons";
+import Footer from "./footer";
 
 const GITHUB = "https://github.com/zenbu-labs/terminal-electron";
 
 export default function Home() {
   return (
+    <>
     <main className="relative z-10 mx-auto w-full max-w-[680px] flex-1 px-6 pt-24 pb-16 sm:pt-32">
       <h1 className="text-[28px] font-semibold tracking-[-0.03em] text-text sm:text-[36px]">
         terminal-electron
@@ -69,5 +71,7 @@ export default function Home() {
         </div>
       </section>
     </main>
+    <Footer />
+    </>
   );
 }

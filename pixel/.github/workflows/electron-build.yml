@@ -52,6 +52,7 @@ jobs:
           name: electron-asset-${{ matrix.platform }}
           path: |
             ${{ runner.temp }}/out/electron-v${{ inputs.version }}-${{ matrix.platform }}.zip
+            ${{ runner.temp }}/out/electron.d.ts
             ${{ runner.temp }}/out/sha-${{ matrix.platform }}.txt
           if-no-files-found: error
 
@@ -94,13 +95,15 @@ jobs:
           version="${{ inputs.version }}"
           tag="electron-v$version"
           cd out
-          ls *.zip >/dev/null
-          cat sha-*.txt > new.txt
+          ls *.zip electron.d.ts >/dev/null
+          # every platform leg generates the same electron.d.ts and lists it
+          cat sha-*.txt | sort -u > new.txt
           notes="Patched Electron v$version for terminal-electron.
 
           Patches (source of truth: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/main/electron/patches):
           - macOS: offscreen-rendering compositors ride a real display link, so page frame rates follow \`webContents.setFrameRate\` instead of being clamped to 60fps on input.
           - Linux: offscreen frames can be delivered through shared memory, and offscreen views keep their requested \`deviceScaleFactor\` on native Wayland instead of having it clobbered to 1.0.
+          - \`electron.d.ts\` is generated from the patched API docs, so it types these additions.
 
           Upstream release: https://github.com/electron/electron/releases/tag/v$version"
           if ! gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
@@ -116,7 +119,7 @@ jobs:
           done < new.txt
           cat new.txt >> SHASUMS256.txt
           gh release upload "$tag" -R "$GITHUB_REPOSITORY" --clobber \
-            *.zip SHASUMS256.txt
+            *.zip electron.d.ts SHASUMS256.txt
 
       - name: Report failure loudly
         if: failure()

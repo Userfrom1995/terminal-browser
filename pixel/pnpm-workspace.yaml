@@ -4,3 +4,4 @@ packages:
   - examples/*
 onlyBuiltDependencies:
   - electron
+linkWorkspacePackages: true

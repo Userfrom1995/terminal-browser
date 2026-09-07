@@ -36,25 +36,27 @@ import { RootContext, handleEntries, useRegistryColors } from "./registry";
 import type { ViewEntry } from "./registry";
 import { makeTheme } from "./theme";
 import type { DownloadProgress } from "./web/browser-session";
-import { PageHost } from "./web/host";
-import type { OpenWindowDecision } from "./web/host";
-import { claimPartition } from "./web/session";
+import { PageHost, decideOpenWindow } from "./web/host";
+import type { BrowserWindowOptions, OpenWindowDecision, OpenWindowPolicy } from "./web/host";
+import { persistentPartition } from "./web/browser-session";
 import { initialWebViewState, snapToCssGrid } from "./web/types";
 import type { DevtoolsDock, SurfaceLayout, WebViewState } from "./web/types";
 import type { ZoomDirection } from "./web/zoom";
 
-export type { DownloadProgress, OpenWindowDecision, WebViewState };
+export type { BrowserWindowOptions, DownloadProgress, OpenWindowDecision, OpenWindowPolicy, WebViewState };
 
 export interface WebViewProps {
   /** [placeholder copy: The url to load. Use a real url; file: urls work too.] */
   src: string;
   style?: Style;
-  /** [placeholder copy: Path to a preload script, like electron's webPreferences.preload.] */
+  /** [placeholder copy: Path to a preload script. Shorthand for browserWindowOptions.webPreferences.preload.] */
   preload?: string;
-  /** [placeholder copy: Storage partition, like electron's webPreferences.partition. Persistent unless it already starts with "persist:".] */
+  /** [placeholder copy: Storage partition. Shorthand for browserWindowOptions.webPreferences.partition, made persistent unless it already starts with "persist:".] */
   partition?: string;
   /** [placeholder copy: Lets the page read the clipboard.] */
   clipboardRead?: boolean;
+  /** [placeholder copy: Electron BrowserWindow options, webPreferences included, passed to the offscreen window behind this view and its popups. Only what the view has to control is excluded: size, visibility, offscreen rendering, dialogs and background throttling.] */
+  browserWindowOptions?: BrowserWindowOptions;
   /** [placeholder copy: Focus the view as soon as it mounts. Defaults to true for the only WebView on screen.] */
   autoFocus?: boolean;
   /** [placeholder copy: Enables the right click menu, the inspect shortcut and a devtools dock inside the view. Defaults to on unless NODE_ENV is "production". A dock side turns it on docked there.] */
@@ -68,8 +70,8 @@ export interface WebViewProps {
   onPointer?(event: PointerEvent): void;
   /** [placeholder copy: Replaces the default right click menu.] */
   onContextMenu?(params: Electron.ContextMenuParams): void;
-  /** [placeholder copy: Decides what window.open and target=_blank do. Defaults to "popup", a stack of popups drawn over the view.] */
-  onOpenWindow?(details: Electron.HandlerDetails): OpenWindowDecision;
+  /** [placeholder copy: What window.open and target=_blank do: "popup" draws a popup over the view, "navigate" loads the url in this view, "deny" ignores it. A function decides per request. By default scripted popups (disposition "new-window") become popups and links open in this view.] */
+  onOpenWindow?: OpenWindowPolicy;
   onDownload?(progress: DownloadProgress): void;
 }
 
@@ -239,10 +241,15 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
     surfaces.current = created;
     registry.register(entry);
     const initial = propsRef.current;
-    const partition = claimPartition(
-      initial.partition ?? null,
-      initial.preload ? path.resolve(initial.preload) : null,
-    );
+    const passthrough = initial.browserWindowOptions ?? {};
+    const browserWindowOptions = {
+      ...passthrough,
+      webPreferences: {
+        ...passthrough.webPreferences,
+        ...(initial.partition ? { partition: persistentPartition(initial.partition) } : {}),
+        ...(initial.preload ? { preload: path.resolve(initial.preload) } : {}),
+      },
+    };
     const info = registry.root.info;
     const host = new PageHost(
       created.page,
@@ -251,8 +258,8 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
       {
         url: initial.src,
         background: registry.background(),
-        partition,
         clipboardRead: !!initial.clipboardRead,
+        browserWindowOptions,
       },
       (state) => {
         debug("state", state);
@@ -287,7 +294,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
       if (custom) custom(params);
       else openMenu(params);
     };
-    host.onOpenWindow = (details) => propsRef.current.onOpenWindow?.(details) ?? "popup";
+    host.onOpenWindow = (details) => decideOpenWindow(propsRef.current.onOpenWindow, details);
     host.onDownload = (progress) => propsRef.current.onDownload?.(progress);
     host.onQuit = () => registry.quit(entry);
     host.onFrameSubmitted = () => {

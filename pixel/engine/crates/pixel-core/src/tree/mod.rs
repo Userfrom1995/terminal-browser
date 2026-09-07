@@ -1276,7 +1276,7 @@ impl Tree {
             if node.pointer_events {
                 return Some(id);
             }
-            if node.clickable || node.input.is_some() {
+            if node.clickable || node.input.is_some() || node.drag_events {
                 return None;
             }
         }

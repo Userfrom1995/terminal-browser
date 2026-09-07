@@ -10,6 +10,7 @@ import { PageInput } from "./input";
 import { offscreenPreferences } from "./offscreen";
 import { BitmapPresenter, presentPaint, shmFrameOf } from "./paint";
 import { PopupWindow } from "./popup";
+import { prepareSession } from "./session";
 import { cssSize, initialWebViewState } from "./types";
 import type { DevtoolsDock, SurfaceLayout, WebViewState } from "./types";
 import { scaleZoom, stepZoom } from "./zoom";
@@ -18,18 +19,67 @@ import type { ZoomDirection } from "./zoom";
 export const QUIT_URL = "terminal-electron://quit";
 
 export type OpenWindowDecision = "popup" | "deny" | "navigate";
+export type OpenWindowPolicy = OpenWindowDecision | ((details: Electron.HandlerDetails) => OpenWindowDecision);
+
+export function defaultOpenWindow(details: Electron.HandlerDetails): OpenWindowDecision {
+  return details.disposition === "new-window" ? "popup" : "navigate";
+}
+
+export function decideOpenWindow(policy: OpenWindowPolicy | undefined, details: Electron.HandlerDetails) {
+  if (typeof policy === "function") return policy(details);
+  return policy ?? defaultOpenWindow(details);
+}
+
+type ReservedWindowOptions = "width" | "height" | "useContentSize" | "show" | "paintWhenInitiallyHidden" | "webPreferences";
+type ReservedWebPreferences = "offscreen" | "disableDialogs" | "backgroundThrottling";
+export type BrowserWindowOptions = Omit<Electron.BrowserWindowConstructorOptions, ReservedWindowOptions> & {
+  webPreferences?: Omit<Electron.WebPreferences, ReservedWebPreferences>;
+};
+
+function windowOptions(
+  passthrough: BrowserWindowOptions,
+  size: { width: number; height: number },
+  offscreen: Electron.WebPreferences["offscreen"],
+): Electron.BrowserWindowConstructorOptions {
+  const { webPreferences, ...window } = passthrough;
+  return {
+    frame: false,
+    skipTaskbar: true,
+    fullscreenable: false,
+    resizable: false,
+    acceptFirstMouse: true,
+    ...window,
+    width: size.width,
+    height: size.height,
+    useContentSize: true,
+    show: false,
+    paintWhenInitiallyHidden: true,
+    webPreferences: {
+      sandbox: true,
+      nodeIntegration: false,
+      // with sandbox true this is safe, we enable so a users preload script runs inside iframes/webviews
+      nodeIntegrationInSubFrames: true,
+      contextIsolation: true,
+      ...webPreferences,
+      offscreen,
+      disableDialogs: true,
+      backgroundThrottling: false,
+    },
+  };
+}
 
 export interface HostOptions {
   url: string;
   background: string;
-  partition: string | null;
   clipboardRead: boolean;
+  browserWindowOptions: BrowserWindowOptions;
 }
 
 export class PageHost {
   readonly surface: Surface;
   private readonly popupSurface: Surface;
   private readonly window: BrowserWindow;
+  private readonly browserWindowOptions: BrowserWindowOptions;
   private readonly onState: (state: WebViewState) => void;
   private renderScale: number;
   private layout: SurfaceLayout;
@@ -37,7 +87,6 @@ export class PageHost {
   private stopped = false;
   private contentFocused = false;
   private readonly input: PageInput;
-  private readonly partition: string | null;
   private readonly clipboardRead: boolean;
   private background: string;
   private pendingPopupSize: { width: number; height: number } | null = null;
@@ -56,7 +105,7 @@ export class PageHost {
   onFrameSubmitted: (() => void) | null = null;
   cursorShape = "default";
   onCursorChange: ((shape: string) => void) | null = null;
-  onOpenWindow: ((details: Electron.HandlerDetails) => OpenWindowDecision) | null = null;
+  onOpenWindow: OpenWindowPolicy | null = null;
   onQuit: (() => void) | null = null;
   onDownload: ((progress: DownloadProgress) => void) | null = null;
   private readonly popups: PopupWindow[] = [];
@@ -78,8 +127,8 @@ export class PageHost {
     options: HostOptions,
     onState: (state: WebViewState) => void,
   ) {
-    this.partition = options.partition;
     this.clipboardRead = options.clipboardRead;
+    this.browserWindowOptions = options.browserWindowOptions;
     this.surface = surface;
     this.bitmaps = new BitmapPresenter(surface);
     this.popupSurface = popupSurface;
@@ -89,29 +138,10 @@ export class PageHost {
     this.renderScale = renderScaleFor(layout);
     this.state = initialWebViewState(options.url);
     const size = this.contentSize(layout);
-    this.window = new BrowserWindow({
-      width: size.width,
-      height: size.height,
-      useContentSize: true,
-      show: false,
-      frame: false,
-      paintWhenInitiallyHidden: true,
-      acceptFirstMouse: true,
-      skipTaskbar: true,
-      fullscreenable: false,
-      resizable: false,
-      webPreferences: {
-        ...(this.partition ? { partition: this.partition } : {}),
-        offscreen: offscreenPreferences(this.renderScale),
-        sandbox: true,
-        nodeIntegration: false,
-        // with sandbox true this is safe, we enable so a users preload script runs inside iframes/webviews
-        nodeIntegrationInSubFrames: true,
-        contextIsolation: true,
-        disableDialogs: true,
-        backgroundThrottling: false,
-      },
-    });
+    this.window = new BrowserWindow(
+      windowOptions(this.browserWindowOptions, size, offscreenPreferences(this.renderScale)),
+    );
+    prepareSession(this.window.webContents.session);
     if (this.clipboardRead) allowClipboardRead(this.window.webContents);
     onDownloadFor(this.window.webContents, (progress) => this.onDownload?.(progress));
     this.input = new PageInput({
@@ -513,7 +543,7 @@ export class PageHost {
   ): Electron.WindowOpenHandlerResponse {
     const { url, disposition, features } = details;
     if (this.quitLink(url)) return { action: "deny" };
-    const decision = this.onOpenWindow?.(details) ?? "popup";
+    const decision = decideOpenWindow(this.onOpenWindow ?? undefined, details);
     if (decision === "deny") return { action: "deny" };
     if (decision === "navigate") {
       void opener.loadURL(url);
@@ -524,26 +554,10 @@ export class PageHost {
     this.pendingPopupSize = size;
     return {
       action: "allow",
-      overrideBrowserWindowOptions: {
-        width: size.width,
-        height: size.height,
-        useContentSize: true,
-        show: false,
-        frame: false,
-        skipTaskbar: true,
-        fullscreenable: false,
-        resizable: false,
-        webPreferences: {
-          ...(this.partition ? { partition: this.partition } : {}),
-          offscreen: { useSharedTexture: false, deviceScaleFactor: this.renderScale },
-          sandbox: true,
-          nodeIntegration: false,
-          nodeIntegrationInSubFrames: true,
-          contextIsolation: true,
-          disableDialogs: true,
-          backgroundThrottling: false,
-        },
-      },
+      overrideBrowserWindowOptions: windowOptions(this.browserWindowOptions, size, {
+        useSharedTexture: false,
+        deviceScaleFactor: this.renderScale,
+      }),
     };
   }
 

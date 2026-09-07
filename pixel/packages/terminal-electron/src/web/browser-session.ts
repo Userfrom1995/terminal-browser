@@ -3,7 +3,7 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { app, net, session } from "electron";
+import { app, net } from "electron";
 import type { Session, WebContents } from "electron";
 
 export interface DownloadProgress {
@@ -60,9 +60,8 @@ export function onDownloadFor(
   contents.once("destroyed", () => downloadHandlers.delete(contents.id));
 }
 
-export function configureBrowserSession(partition: string | null): Session {
-  const target = browserSession(partition);
-  if (configured.has(target)) return target;
+export function configureBrowserSession(target: Session): void {
+  if (configured.has(target)) return;
   configured.add(target);
 
   target.registerPreloadScript({ type: "frame", filePath: selectPreloadPath() });
@@ -103,12 +102,6 @@ export function configureBrowserSession(partition: string | null): Session {
     item.once("done", (_done, state) => report(state === "completed" ? "done" : "failed"));
     report("progressing");
   });
-
-  return target;
-}
-
-export function browserSession(partition: string | null): Session {
-  return partition ? session.fromPartition(persistentPartition(partition)) : session.defaultSession;
 }
 
 export function persistentPartition(partition: string): string {

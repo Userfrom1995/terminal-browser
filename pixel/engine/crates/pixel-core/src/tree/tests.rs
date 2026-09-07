@@ -96,6 +96,36 @@ fn pointer_hit_prefers_the_topmost_pointer_surface() {
 }
 
 #[test]
+fn pointer_hit_stops_at_a_drag_surface_drawn_over_it() {
+    let mut tree = Tree::new((200.0, 100.0));
+    let page = tree.create(Props {
+        style: Style {
+            width: Dimension::Px(200.0),
+            height: Dimension::Px(100.0),
+            ..Style::default()
+        },
+        pointer_events: true,
+        ..Props::default()
+    });
+    let canvas = tree.create(Props {
+        style: Style {
+            position: Position::Absolute,
+            width: Dimension::Px(50.0),
+            height: Dimension::Px(50.0),
+            ..Style::default()
+        },
+        drag_events: true,
+        ..Props::default()
+    });
+    tree.append(tree.root(), page);
+    tree.append(tree.root(), canvas);
+    tree.flush_layout(&[font()], 16.0);
+    assert_eq!(tree.hit_pointer(10.0, 10.0), None);
+    assert_eq!(tree.hit_drag(10.0, 10.0), Some(canvas));
+    assert_eq!(tree.hit_pointer(100.0, 50.0), Some(page));
+}
+
+#[test]
 fn exposes_rects_by_key_and_paints_background() {
     let mut tree = tree_of(
         (100.0, 40.0),

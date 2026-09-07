@@ -1,3 +1,4 @@
+/// <reference path="../../electron/electron.d.ts" preserve="true" />
 /** [placeholder copy: The terminal's colours as rgb triples. `ansi` has 16 slots and is null where the terminal did not report a colour.] */
 export interface TerminalTheme {
   background: number[];
