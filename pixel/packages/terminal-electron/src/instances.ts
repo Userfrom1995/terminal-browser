@@ -111,19 +111,49 @@ export function announceGuest(owner: Instance, name: string): { pane: string; en
   };
 }
 
-// Resolves once no live root owns the tty. An owner hands over to a successor
-// by closing its socket, so each owner is watched until its socket drops.
+// A tab handoff has a gap: the outgoing owner drops its record before the
+// successor has taken the tty over and written its own. This marker spans that
+// gap so the launcher keeps standing in for the pane instead of handing the
+// prompt back and hanging up the successor with it.
+function handoffMarker(tty: string, env: NodeJS.ProcessEnv = process.env): string {
+  return path.join(instancesDir(env), `${instanceKey(tty)}.handoff`);
+}
+
+export function markHandoff(tty: string, env: NodeJS.ProcessEnv = process.env): void {
+  try {
+    fs.mkdirSync(instancesDir(env), { recursive: true });
+    fs.writeFileSync(handoffMarker(tty, env), String(Date.now()));
+  } catch {}
+}
+
+export function clearHandoff(tty: string, env: NodeJS.ProcessEnv = process.env): void {
+  try {
+    fs.rmSync(handoffMarker(tty, env), { force: true });
+  } catch {}
+}
+
+// A marker older than a handoff could ever take is from a process that died
+// mid-handoff; ignore it so the launcher never waits on nobody.
+function handoffPending(tty: string, env: NodeJS.ProcessEnv = process.env): boolean {
+  try {
+    return Date.now() - Number(fs.readFileSync(handoffMarker(tty, env), "utf8")) < 20000;
+  } catch {
+    return false;
+  }
+}
+
+// Resolves once no live root owns the tty and no handoff is mid-flight. An
+// owner hands over to a successor by closing its socket, so each owner is
+// watched until its socket drops.
 export async function waitForOwners(tty: string, env: NodeJS.ProcessEnv = process.env): Promise<void> {
   const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
   for (;;) {
-    let owner = findOwner(tty, env);
-    // A successor registers only after it has taken the tty over; give it time.
-    const patience = Date.now() + 5000;
-    while (!owner && Date.now() < patience) {
+    const owner = findOwner(tty, env);
+    if (!owner) {
+      if (!handoffPending(tty, env)) return;
       await sleep(50);
-      owner = findOwner(tty, env);
+      continue;
     }
-    if (!owner) return;
     await new Promise<void>((resolve) => {
       const socket = net.connect(owner.socket);
       const done = () => {

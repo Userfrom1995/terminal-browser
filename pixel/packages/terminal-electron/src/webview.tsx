@@ -55,6 +55,8 @@ export interface WebViewProps {
   partition?: string;
   /** [placeholder copy: Lets the page read the clipboard.] */
   clipboardRead?: boolean;
+  /** [placeholder copy: Chromium proxy rules for this page's traffic, for example socks5://127.0.0.1:1080. A proxy applies to the whole storage partition, so give a proxied view its own partition.] */
+  proxy?: string;
   /** [placeholder copy: Electron BrowserWindow options, webPreferences included, passed to the offscreen window behind this view and its popups. Only what the view has to control is excluded: size, visibility, offscreen rendering, dialogs and background throttling.] */
   browserWindowOptions?: BrowserWindowOptions;
   /** [placeholder copy: Focus the view as soon as it mounts. Defaults to true for the only WebView on screen.] */
@@ -259,6 +261,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
         url: initial.src,
         background: registry.background(),
         clipboardRead: !!initial.clipboardRead,
+        proxy: initial.proxy ?? null,
         browserWindowOptions,
       },
       (state) => {
@@ -359,9 +362,10 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
     hostRef.current?.navigate(props.src);
   }, [props.src]);
 
-  const openMenu = (params: Electron.ContextMenuParams) => {
+  const openMenu = async (params: Electron.ContextMenuParams) => {
     const host = hostRef.current;
     if (!host || host.popup) return;
+    const canPaste = params.isEditable && (await clipboard.readText()).length > 0;
     const state = stateRef.current;
     const selectionText = params.selectionText.trim();
     const mac = process.platform === "darwin";
@@ -377,7 +381,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
       items.push({
         id: "paste",
         label: "paste",
-        enabled: clipboard.readText().length > 0,
+        enabled: canPaste,
         shortcut: mac ? "cmd+v" : "ctrl+v",
       });
     }
@@ -415,7 +419,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
       case "copy":
         return registry.root.setClipboard(current.selectionText);
       case "paste":
-        return host.paste(clipboard.readText());
+        return clipboard.readText().then((text) => host.paste(text));
       case "open-link":
         return host.navigate(current.linkURL);
       case "copy-link":

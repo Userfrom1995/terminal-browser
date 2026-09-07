@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { paneById } from "../shared";
+import { adjacentPane, paneById } from "../shared";
+import type { PaneRect } from "../shared";
 import type { Detect, Pane, PaneDetails } from "../terminal";
 
 // todo: do this automatically
@@ -18,12 +19,58 @@ interface KittyWindow {
   foreground_processes?: { pid?: number; cmdline?: string[] }[];
 }
 
+interface KittyPair {
+  horizontal?: boolean;
+  bias?: number;
+  one?: number | KittyPair;
+  two?: number | KittyPair;
+}
+
 interface KittyTab {
   id: number;
   is_active: boolean;
   layout: string;
+  layout_state?: { pairs?: KittyPair };
   enabled_layouts: string[];
   windows: KittyWindow[];
+  groups?: { id: number; windows: number[] }[];
+}
+
+// kitty reports the splits layout as a tree of pairs with a bias rather than
+// pane positions. Walking it with each pair's bias gives every pane a
+// rectangle on a fixed grid, which is all adjacency needs.
+const GRID = 10000;
+
+function pairRects(tab: KittyTab): PaneRect[] {
+  const pairs = tab.layout_state?.pairs;
+  if (tab.layout !== "splits" || !pairs) return [];
+  const groups = new Map((tab.groups ?? []).map((group) => [group.id, group.windows[0]]));
+  const windowIds = new Set(tab.windows.map((window) => window.id));
+  const rects: PaneRect[] = [];
+  const walk = (node: number | KittyPair | undefined, left: number, top: number, width: number, height: number) => {
+    if (node === undefined) return;
+    if (typeof node === "number") {
+      const id = windowIds.has(node) ? node : groups.get(node);
+      if (id !== undefined) rects.push({ id: String(id), left, top, right: left + width - 1, bottom: top + height - 1 });
+      return;
+    }
+    const bias = node.bias ?? 0.5;
+    if (node.one === undefined || node.two === undefined) {
+      walk(node.one ?? node.two, left, top, width, height);
+      return;
+    }
+    if (node.horizontal ?? true) {
+      const first = Math.round(width * bias);
+      walk(node.one, left, top, first, height);
+      walk(node.two, left + first, top, width - first, height);
+    } else {
+      const first = Math.round(height * bias);
+      walk(node.one, left, top, width, first);
+      walk(node.two, left, top + first, width, height - first);
+    }
+  };
+  walk(pairs, 0, 0, GRID, GRID);
+  return rects;
 }
 
 interface KittyOsWindow {
@@ -143,10 +190,24 @@ export const kitty: Detect = (env, run) => {
     await kitten(["goto-layout", ...match, "splits"]);
   }
 
+  async function neighbor(from: Pane, direction: "right" | "left" | "down" | "up"): Promise<Pane | null> {
+    const self = Number(from.id);
+    const tab = (await osWindows())
+      .flatMap((osWindow) => osWindow.tabs)
+      .find((candidate) => candidate.windows.some((window) => window.id === self));
+    if (!tab) return null;
+    const rects = pairRects(tab);
+    const own = rects.find((rect) => rect.id === from.id);
+    if (!own) return null;
+    const found = adjacentPane(own, rects, direction, 1);
+    return found ? { id: found.id, tab: from.tab } : null;
+  }
+
   return {
     name: "kitty",
     getCurrentPane: () => paneById(panes, env.KITTY_WINDOW_ID),
     listPanes,
+    neighbor,
     async sendText(pane, text) {
       const target = ["send-text", "--match", `id:${pane}`, "--stdin"];
       try {

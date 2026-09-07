@@ -1,6 +1,6 @@
 import { BrowserWindow, screen } from "electron";
 import type { EngineKeyEvent, PastedImage, PointerEvent, Surface, WheelEvent } from "../react";
-import { allowClipboardRead, onDownloadFor } from "./browser-session";
+import { allowClipboardRead, onDownloadFor, routeThroughProxy } from "./browser-session";
 import type { DownloadProgress } from "./browser-session";
 import { cursorShapeFor } from "./cursor";
 import { DevtoolsWindow } from "./devtools";
@@ -72,6 +72,7 @@ export interface HostOptions {
   url: string;
   background: string;
   clipboardRead: boolean;
+  proxy: string | null;
   browserWindowOptions: BrowserWindowOptions;
 }
 
@@ -142,6 +143,7 @@ export class PageHost {
       windowOptions(this.browserWindowOptions, size, offscreenPreferences(this.renderScale)),
     );
     prepareSession(this.window.webContents.session);
+    if (options.proxy) void routeThroughProxy(this.window.webContents.session, options.proxy);
     if (this.clipboardRead) allowClipboardRead(this.window.webContents);
     onDownloadFor(this.window.webContents, (progress) => this.onDownload?.(progress));
     this.input = new PageInput({

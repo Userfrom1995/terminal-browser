@@ -10,7 +10,15 @@ import { debug } from "./debug";
 import { Shell } from "./host/shell";
 import { OwnerServer } from "./host/server";
 import { PaneShell } from "./host/strip";
-import { InstanceRecord, PROTOCOL, findOwner, instanceKey, instancesDir } from "./instances";
+import {
+  InstanceRecord,
+  PROTOCOL,
+  clearHandoff,
+  findOwner,
+  instanceKey,
+  instancesDir,
+  markHandoff,
+} from "./instances";
 import type { Instance } from "./instances";
 import { createRoot as createEngineRoot } from "./react";
 import type { EngineKeyEvent, PixelRoot, RootOptions as EngineRootOptions } from "./react";
@@ -149,6 +157,7 @@ export function createRoot(options: RootOptions = {}): Root {
   };
 
   const finish = (code: number) => {
+    if (tty) clearHandoff(tty, env);
     if (options.onExit) options.onExit(code);
     else app.exit(code);
   };
@@ -324,6 +333,7 @@ export function createRoot(options: RootOptions = {}): Root {
       quit(null);
       return;
     }
+    markHandoff(tty, env);
     successor.send({ type: "adopt", tty });
     for (const other of shell.others(successor)) other.send({ type: "rejoin", socket: socketPath });
     shutdown(0, () => finishAfterSuccessor(0));

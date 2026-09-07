@@ -9,6 +9,47 @@ export interface CallerTty {
   denied: boolean;
 }
 
+export interface PaneRect {
+  id: string;
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+// Picks the pane whose edge touches `from` on the given side, allowing for the
+// one-cell divider terminals draw between panes. Among several, the one that
+// shares the most edge wins.
+export function adjacentPane(
+  from: PaneRect,
+  candidates: PaneRect[],
+  direction: "right" | "left" | "down" | "up",
+  gap = 2,
+): PaneRect | null {
+  const touches = (candidate: PaneRect) => {
+    switch (direction) {
+      case "right":
+        return candidate.left > from.right && candidate.left <= from.right + gap;
+      case "left":
+        return candidate.right < from.left && candidate.right >= from.left - gap;
+      case "down":
+        return candidate.top > from.bottom && candidate.top <= from.bottom + gap;
+      case "up":
+        return candidate.bottom < from.top && candidate.bottom >= from.top - gap;
+    }
+  };
+  const overlap = (candidate: PaneRect) =>
+    direction === "right" || direction === "left"
+      ? Math.min(candidate.bottom, from.bottom) - Math.max(candidate.top, from.top)
+      : Math.min(candidate.right, from.right) - Math.max(candidate.left, from.left);
+  let best: PaneRect | null = null;
+  for (const candidate of candidates) {
+    if (candidate.id === from.id || !touches(candidate) || overlap(candidate) < 0) continue;
+    if (!best || overlap(candidate) > overlap(best)) best = candidate;
+  }
+  return best;
+}
+
 export function callerTty(): CallerTty {
   let pid = process.pid;
   for (let hops = 0; hops < 30 && pid > 1; hops++) {

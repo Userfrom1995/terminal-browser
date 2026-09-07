@@ -49,6 +49,7 @@ export default function Api() {
           ["src: string", "The URL to load. file: URLs work."],
           ["style?: Style", "Size, position and corner radius. The page fills the box."],
           ["preload?: string", "Path to a preload script. Shorthand for browserWindowOptions.webPreferences.preload."],
+          ["proxy?: string", "Chromium proxy rules for the page's traffic, such as socks5://127.0.0.1:1080 from an ssh tunnel. WebRTC is kept from bypassing it. A proxy applies to a whole storage partition, so pair it with a partition of its own."],
           ["browserWindowOptions", "Anything you would pass to new BrowserWindow, webPreferences included. It reaches the offscreen window behind the view and its popups unchanged, so sandboxing, node integration, context isolation and the rest are yours to decide. Only what the view has to control is left out of the type: size, visibility, offscreen rendering, dialogs and background throttling."],
           ["partition?: string", "Storage partition for cookies and local storage. Shorthand for browserWindowOptions.webPreferences.partition, made persistent unless it already starts with persist:."],
           ["clipboardRead?: boolean", "Allow the page to read the clipboard."],
@@ -147,6 +148,7 @@ contextBridge.exposeInMainWorld("terminalElectron", {
       <Rows
         rows={[
           ["detect(env?)", "Which supported terminal this process is running in, or null. The result knows how to list panes, open a new pane, send text to a pane and focus one, where the terminal allows it."],
+          ["terminal.neighbor(pane, direction)", "The pane directly beside a pane in a direction, or null at the edge of the tab. Present on herdr, tmux, wezterm, kitty, Ghostty and cmux. A launcher uses it to tell whether a new split would land next to a pane it already owns."],
           ["checkTerminal(terminal)  probeGraphics(terminal)", "Ask the terminal whether it can display images. Needs a real terminal to talk to."],
           ["canSplit(terminal)  cannotOpenPanes(terminal)", "Whether new panes can be opened programmatically, and the message to show a user when they cannot."],
           ["callerTty()", "The terminal device of the shell that ran this command, even from a subprocess."],
@@ -157,6 +159,40 @@ contextBridge.exposeInMainWorld("terminalElectron", {
         The launcher has no option to open a new pane on purpose. If your app wants to appear next to the shell that
         started it, its own command uses <InlineCode>detect()</InlineCode> and <InlineCode>split()</InlineCode> from
         here to open the pane and run the launcher inside it.
+      </Note>
+
+      <H2 id="ssh"><InlineCode>terminal-electron/ssh</InlineCode></H2>
+      <P>
+        Plain Node as well: browse from another machine by tunnelling a page&apos;s traffic over ssh, and optionally run
+        a server there first. One call does the whole thing and hands back the props a WebView needs.
+      </P>
+      <Code title="cli.ts">{`
+import { connectSsh } from "terminal-electron/ssh";
+
+const session = await connectSsh({ target: "dev@build-box", bundle: "./my-server", status: console.error });
+// later, in the app:  <WebView src={session.url} {...session.view} />
+`}</Code>
+      <Rows
+        rows={[
+          ["connectSsh({ target, bundle?, remoteBase?, status?, terminal? })", "Opens the tunnel, installs and starts the bundle if one is given, and resolves with the session: url from the bundle, view props { proxy, partition } for the WebView, the socks port, and stop(). Stopping also runs when the process exits. target is anything you would type after ssh, including a shell alias. By default ssh may use this process's terminal for prompts; pass terminal: false from inside a running app, where ssh then fails instead of prompting."],
+        ]}
+      />
+      <H3 id="bundles">Bundles</H3>
+      <P>
+        A bundle is a directory the library copies to the host once, keyed by its contents. It must contain an executable{" "}
+        <InlineCode>start</InlineCode> that prints <InlineCode>READY &lt;url&gt;</InlineCode> once its server listens. It
+        may contain <InlineCode>setup</InlineCode>, run the first time only, <InlineCode>stop</InlineCode>, run on exit,
+        and a <InlineCode>manifest.json</InlineCode> with a name. Nothing else is assumed about it. Installs land under{" "}
+        <InlineCode>~/.local/share/terminal-electron/bundles</InlineCode> on the host unless remoteBase says otherwise.
+      </P>
+      <Rows
+        rows={[
+          ["openSshTunnel  startBundle  socksProxyRules  validateBundleDir  parseSshTarget  resolveSshTarget", "The pieces connectSsh is made of, for an app that needs to order them differently."],
+        ]}
+      />
+      <Note>
+        A tunnel opened before the app starts can prompt for a password or host key on the terminal. One opened from
+        inside a running app cannot, since the app owns the terminal by then, so the host must accept a key.
       </Note>
       <Next href="/docs/composition">Several apps in one pane</Next>
     </>

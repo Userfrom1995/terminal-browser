@@ -21,6 +21,10 @@
       "types": "./dist/terminal/index.d.ts",
       "default": "./dist/terminal/index.js"
     },
+    "./ssh": {
+      "types": "./dist/ssh/index.d.ts",
+      "default": "./dist/ssh/index.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -29,7 +33,7 @@
     "scripts/apparmor.sh"
   ],
   "config": {
-    "electron": "43.6.0"
+    "electron": "44.2.0"
   },
   "scripts": {
     "postinstall": "node scripts/postinstall.mjs",

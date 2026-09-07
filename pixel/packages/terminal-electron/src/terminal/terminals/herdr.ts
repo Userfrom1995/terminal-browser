@@ -139,6 +139,13 @@ export const herdr: Detect = (env, run) => {
     prepare,
     getCurrentPane: async () => ({ id: env.HERDR_PANE_ID!, tab: env.HERDR_TAB_ID! }),
     listPanes,
+    async neighbor(from, direction) {
+      const { result } = JSON.parse(await herdr(["pane", "neighbor", "--pane", from.id, "--direction", direction])) as {
+        result: { neighbor: { neighbor_pane_id: string | null; layout: { tab_id: string } } };
+      };
+      const id = result.neighbor.neighbor_pane_id;
+      return id ? { id, tab: result.neighbor.layout.tab_id } : null;
+    },
     async sendText(pane, text) {
       await herdr(["pane", "send-text", pane, bracketedPaste(text)]);
     },

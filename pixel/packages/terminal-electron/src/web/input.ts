@@ -1,4 +1,4 @@
-import { clipboard, nativeImage } from "electron";
+import { clipboard, ClipboardItem, nativeImage } from "electron";
 import type { WebContents } from "electron";
 import type { EngineKeyEvent, PastedImage, PointerEvent, WheelEvent } from "../react";
 
@@ -223,7 +223,7 @@ export class PageInput {
     return "";
   }
 
-  pasteImage(image: PastedImage) {
+  async pasteImage(image: PastedImage): Promise<void> {
     this.syncFocus();
     switch (image.source) {
       case "clipboard":
@@ -233,7 +233,8 @@ export class PageInput {
       case "file": {
         const staged = nativeImage.createFromPath(image.path);
         if (staged.isEmpty()) return;
-        clipboard.writeImage(staged);
+        const png = new Blob([new Uint8Array(staged.toPNG())], { type: "image/png" });
+        await clipboard.write([new ClipboardItem({ "image/png": png })]);
         this.target.contents().paste();
         return;
       }

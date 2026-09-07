@@ -214,3 +214,67 @@ test("herdr prepare stays silent when herdr itself cannot be run", async () => {
   assert.deepEqual(warnings, []);
 });
 
+
+test("tmux finds the pane touching the given side, across the divider", async () => {
+  const listing = "%18\t0\t0\t157\t20\n%19\t0\t22\t157\t41\n%20\t159\t0\t200\t41\n";
+  const { run } = recorder({ "tmux list-panes -t %18 -F #{pane_id}\t#{pane_left}\t#{pane_top}\t#{pane_right}\t#{pane_bottom}": listing });
+  const terminal = detect({ TMUX: "/tmp/x,1,0", TMUX_PANE: "%18" }, run);
+  const from = { id: "%18", tab: "main:@1" };
+  assert.deepEqual(await terminal.neighbor(from, "down"), { id: "%19", tab: "main:@1" });
+  assert.deepEqual(await terminal.neighbor(from, "right"), { id: "%20", tab: "main:@1" });
+  assert.equal(await terminal.neighbor(from, "up"), null);
+  assert.equal(await terminal.neighbor(from, "left"), null);
+});
+
+test("herdr asks the terminal for the neighbor", async () => {
+  const answer = JSON.stringify({ result: { neighbor: { neighbor_pane_id: "wJ:p3", layout: { tab_id: "wJ:t1" } } } });
+  const none = JSON.stringify({ result: { neighbor: { neighbor_pane_id: null, layout: { tab_id: "wJ:t1" } } } });
+  const { run } = recorder({
+    "herdr pane neighbor --pane wJ:p1 --direction right": answer,
+    "herdr pane neighbor --pane wJ:p1 --direction left": none,
+  });
+  const terminal = detect({ HERDR_PANE_ID: "wJ:p1", HERDR_TAB_ID: "wJ:t1", TERM_PROGRAM: "herdr" }, run);
+  assert.equal(terminal?.name, "herdr");
+  assert.deepEqual(await terminal.neighbor({ id: "wJ:p1", tab: "wJ:t1" }, "right"), { id: "wJ:p3", tab: "wJ:t1" });
+  assert.equal(await terminal.neighbor({ id: "wJ:p1", tab: "wJ:t1" }, "left"), null);
+});
+
+test("kitty rebuilds pane rectangles from the splits pair tree", async () => {
+  const ls = JSON.stringify([{ id: 1, tabs: [{
+    id: 7, is_active: true, layout: "splits", enabled_layouts: ["splits"],
+    layout_state: { pairs: { horizontal: true, bias: 0.4, one: 10, two: { horizontal: false, one: 11, two: 12 } } },
+    groups: [{ id: 10, windows: [100] }, { id: 11, windows: [101] }, { id: 12, windows: [102] }],
+    windows: [{ id: 100 }, { id: 101 }, { id: 102 }],
+  }] }]);
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), "fake-kitten-"));
+  fs.writeFileSync(path.join(bin, "kitten"), "#!/bin/sh\n", { mode: 0o755 });
+  const { run } = recorder({ [`${path.join(bin, "kitten")} @ ls`]: ls });
+  const terminal = detect({ TERM: "xterm-kitty", KITTY_WINDOW_ID: "100", KITTY_PID: "1", PATH: bin }, run);
+  const from = { id: "100", tab: "1:7" };
+  assert.deepEqual(await terminal.neighbor(from, "right"), { id: "101", tab: "1:7" });
+  assert.equal(await terminal.neighbor(from, "left"), null);
+  assert.deepEqual(await terminal.neighbor({ id: "102", tab: "1:7" }, "up"), { id: "101", tab: "1:7" });
+  assert.deepEqual(await terminal.neighbor({ id: "102", tab: "1:7" }, "left"), { id: "100", tab: "1:7" });
+});
+
+test("cmux uses pane frames from the socket and answers with the neighbor's shown surface", async () => {
+  const paneList = JSON.stringify({ panes: [
+    { id: "pane-a", pixel_frame: { x: 0, y: 0, width: 600, height: 800 } },
+    { id: "pane-b", pixel_frame: { x: 604, y: 0, width: 596, height: 400 } },
+    { id: "pane-c", pixel_frame: { x: 604, y: 404, width: 596, height: 396 } },
+  ] });
+  const exec = {
+    'cmux rpc pane.list {"workspace_id":"ws-1"} --json --id-format both': paneList,
+    "cmux list-pane-surfaces --pane pane-a --json --id-format both": JSON.stringify({ surfaces: [{ id: "s-a", focused: true }] }),
+    "cmux list-pane-surfaces --pane pane-b --json --id-format both": JSON.stringify({ surfaces: [{ id: "s-b1" }, { id: "s-b2", focused: true }] }),
+    "cmux list-pane-surfaces --pane pane-c --json --id-format both": JSON.stringify({ surfaces: [{ id: "s-c" }] }),
+  };
+  const { run } = recorder(exec);
+  const terminal = detect({ CMUX_SURFACE_ID: "s-a", CMUX_WORKSPACE_ID: "ws-1" }, run);
+  assert.equal(terminal?.name, "cmux");
+  const from = { id: "s-a", tab: "ws-1" };
+  assert.deepEqual(await terminal.neighbor(from, "right"), { id: "s-b2", tab: "ws-1" });
+  assert.equal(await terminal.neighbor(from, "left"), null);
+  assert.deepEqual(await terminal.neighbor({ id: "s-c", tab: "ws-1" }, "up"), { id: "s-b2", tab: "ws-1" });
+  assert.deepEqual(await terminal.neighbor({ id: "s-b1", tab: "ws-1" }, "left"), { id: "s-a", tab: "ws-1" });
+});

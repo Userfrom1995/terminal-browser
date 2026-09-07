@@ -5,7 +5,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
-    "start": "tsc -p tsconfig.json && terminal-electron ."
+    "start": "tsc -p tsconfig.json && terminal-electron . --"
   },
   "dependencies": {
     "react": "^18.3.1",

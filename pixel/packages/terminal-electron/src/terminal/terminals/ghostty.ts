@@ -96,6 +96,31 @@ const FOCUS_SCRIPT = byId("    focus term");
 const RESIZE_SCRIPT = onPane(`            set r to perform action (item 2 of argv) on term
             return r as text`);
 
+// Ghostty does not report where splits sit, but goto_split says whether it
+// could move and the tab says where focus landed. Focus is put back right
+// after, so the probe leaves the tab as it found it.
+// Focus moves a moment after the action returns, so both the move and the
+// restore are waited for rather than read back immediately.
+const NEIGHBOR_SCRIPT = onPane(`            set startId to (id of focused terminal of tb) as text
+            set moved to perform action ("goto_split:" & (item 2 of argv)) on term
+            set endId to startId
+            if moved then
+              repeat 50 times
+                set endId to (id of focused terminal of tb) as text
+                if endId is not startId then exit repeat
+                delay 0.02
+              end repeat
+              if endId is not startId then
+                perform action "goto_split:previous" on (focused terminal of tb)
+                repeat 50 times
+                  if ((id of focused terminal of tb) as text) is startId then exit repeat
+                  delay 0.02
+                end repeat
+              end if
+            end if
+            if moved and endId is not targetId then return endId
+            return ""`);
+
 
 function markerDirectory(): string {
   const name = `terminal-electron-pane-${process.pid}-`;
@@ -318,6 +343,10 @@ export const ghostty: Detect = (env, run) => {
     async sendText(pane, text) {
       const result = await osascript(SEND_TEXT_SCRIPT, [pane, text]);
       if (result !== "ok") throw new Error(`Ghostty could not type into pane ${pane}`);
+    },
+    async neighbor(from, direction) {
+      const result = (await osascript(NEIGHBOR_SCRIPT, [from.id, direction])).trim();
+      return result && result !== "not-found" ? { id: result, tab: from.tab } : null;
     },
     async focusPane(pane) {
       const result = await osascript(FOCUS_SCRIPT, [pane]);

@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 
-import { paneById, shellQuote } from "../shared";
+import { adjacentPane, paneById, shellQuote } from "../shared";
+import type { PaneRect } from "../shared";
 import type { Detect, Pane, PaneDetails } from "../terminal";
 
 const SPLIT_FLAG = { right: "-h", left: "-h", down: "-v", up: "-v" } as const;
@@ -56,12 +57,33 @@ export const tmux: Detect = (env, run) => {
     return best?.tty ?? null;
   }
 
+  async function neighbor(from: Pane, direction: "right" | "left" | "down" | "up"): Promise<Pane | null> {
+    const listing = await tmux([
+      "list-panes",
+      "-t",
+      from.id,
+      "-F",
+      "#{pane_id}\t#{pane_left}\t#{pane_top}\t#{pane_right}\t#{pane_bottom}",
+    ]);
+    const rects: PaneRect[] = [];
+    for (const line of listing.split("\n")) {
+      if (!line.trim()) continue;
+      const [id, left, top, right, bottom] = line.split("\t");
+      rects.push({ id, left: Number(left), top: Number(top), right: Number(right), bottom: Number(bottom) });
+    }
+    const self = rects.find((rect) => rect.id === from.id);
+    if (!self) return null;
+    const found = adjacentPane(self, rects, direction);
+    return found ? { id: found.id, tab: from.tab } : null;
+  }
+
   return {
     name: "tmux",
     wrapper: "tmux",
     prepare: () => prepareTmux(env),
     getCurrentPane: () => paneById(panes, env.TMUX_PANE),
     listPanes,
+    neighbor,
     async sendText(pane, text) {
       if (text === "") return;
       await run("tmux", ["load-buffer", "-b", "terminal-electron-send", "-"], text);

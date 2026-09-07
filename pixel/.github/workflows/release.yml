@@ -1,20 +1,70 @@
 name: release
 
+# One button: run this workflow with a bump and it tags the next version, builds
+# the engine on every platform, and publishes all five packages to npm through
+# npm's trusted publishing (OIDC), so no npm token lives in this repo. Pushing a
+# v* tag by hand does the same without the bump.
 on:
   push:
     branches: [main]
     tags: ["v*"]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Cut a release"
+        type: choice
+        default: patch
+        options: [patch, minor, major]
 
 permissions:
   contents: read
-  id-token: write
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && 'cut' || github.ref }}
+  cancel-in-progress: false
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      ref: ${{ steps.v.outputs.ref }}
+      release: ${{ steps.v.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: v
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+            echo "ref=$GITHUB_REF" >> "$GITHUB_OUTPUT"
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = workflow_dispatch ]; then
+            TAG="$(scripts/next-version.sh "${{ inputs.bump }}")"
+            VERSION="${TAG#v}"
+            git -c user.name="terminal-electron release" -c user.email="release@zenbu.dev" \
+              tag -a "$TAG" -m "terminal-electron $TAG"
+            git push origin "$TAG"
+            echo "ref=refs/tags/$TAG" >> "$GITHUB_OUTPUT"
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            VERSION="0.0.0-$(git rev-parse --short HEAD)"
+            echo "ref=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
   check:
+    needs: prepare
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -28,6 +78,7 @@ jobs:
         working-directory: engine
 
   native:
+    needs: prepare
     strategy:
       fail-fast: false
       matrix:
@@ -43,6 +94,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -61,16 +114,23 @@ jobs:
           if-no-files-found: error
 
   publish:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [check, native]
+    if: needs.prepare.outputs.release == 'true'
+    needs: [prepare, check, native]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
+      # trusted publishing needs a newer npm than node 22 bundles
+      - run: npm install -g npm@latest
       - uses: actions/download-artifact@v4
         with:
           pattern: native-*
@@ -86,7 +146,7 @@ jobs:
       - run: pnpm --filter terminal-electron build
       - name: Stamp versions from the tag
         run: |
-          VERSION="${GITHUB_REF#refs/tags/v}"
+          VERSION="${{ needs.prepare.outputs.version }}"
           for pkg in packages/native/* packages/terminal-electron; do
             (cd "$pkg" && npm version "$VERSION" --no-git-tag-version --allow-same-version)
           done
@@ -98,10 +158,14 @@ jobs:
             fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");
           ' "$VERSION"
       - name: Publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           for pkg in packages/native/*; do
             (cd "$pkg" && npm publish --access public --provenance)
           done
           (cd packages/terminal-electron && npm publish --access public --provenance)
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ needs.prepare.outputs.version }}" -R "$GITHUB_REPOSITORY" \
+            --title "terminal-electron v${{ needs.prepare.outputs.version }}" --generate-notes
