@@ -121,6 +121,10 @@ pub(crate) fn kitty_transmit_placed(
     }
     out
 }
+pub(crate) fn kitty_delete_one(image_id: u32) -> Vec<u8> {
+    format!("\x1b_Ga=d,d=I,i={image_id},q=2\x1b\\").into_bytes()
+}
+
 // verify this is needed later
 pub(crate) fn kitty_delete(image_id: u32, wrapper: Wrapper) -> Vec<u8> {
     if wrapper.relayed() {

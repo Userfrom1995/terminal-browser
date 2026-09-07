@@ -29,6 +29,9 @@ pub(crate) struct Herdr {
     frames: BufReader<UnixStream>,
     directory: PathBuf,
     cell: (u32, u32),
+    // Set when the host only takes bgra frames; the copy into the frame file
+    // then swaps channels instead of costing a second pass.
+    bgra: bool,
     files: Vec<FrameFile>,
     retired: Vec<FrameFile>,
     instance: u64,
@@ -64,6 +67,7 @@ impl Herdr {
         if cell.0 == 0 || cell.1 == 0 {
             return None;
         }
+        let bgra = !info.contains("\"rgba\"") && info.contains("\"bgra\"");
 
         let stream = UnixStream::connect(socket).ok()?;
         stream.set_read_timeout(Some(OPEN_TIMEOUT)).ok()?;
@@ -87,6 +91,7 @@ impl Herdr {
             frames,
             directory,
             cell,
+            bgra,
             files: Vec::new(),
             retired: Vec::new(),
             instance: 0,
@@ -123,7 +128,8 @@ impl Herdr {
     pub(crate) fn present(&mut self, canvas: &Canvas) -> io::Result<usize> {
         let path = crate::profiler::span("herdr.handoff", || self.write_frame(&canvas.pixels))?;
         let header = format!(
-            r#"{{"format":"rgba","image_width":{},"image_height":{},"file":{{"path":{}}},"sequence":{},"revision":0,"placement":{{"viewport_col":0,"viewport_row":0,"grid_cols":{},"grid_rows":{}}}}}"#,
+            r#"{{"format":"{}","image_width":{},"image_height":{},"file":{{"path":{}}},"sequence":{},"revision":0,"placement":{{"viewport_col":0,"viewport_row":0,"grid_cols":{},"grid_rows":{}}}}}"#,
+            if self.bgra { "bgra" } else { "rgba" },
             canvas.width,
             canvas.height,
             quote(&path),
@@ -159,7 +165,11 @@ impl Herdr {
             }
         }
         let file = &mut self.files[(self.seq % SLOTS) as usize];
-        file.write(pixels);
+        if self.bgra {
+            file.write_bgra(pixels);
+        } else {
+            file.write(pixels);
+        }
         Ok(file.path().to_string_lossy().into_owned())
     }
 }
@@ -250,6 +260,13 @@ fn field_bool(json: &str, key: &str) -> Option<bool> {
         rest if rest.starts_with("true") => Some(true),
         rest if rest.starts_with("false") => Some(false),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod tests_support {
+    pub(crate) fn frame_path(header: &str) -> String {
+        super::field_str(header, "path").expect("frame header names its file")
     }
 }
 

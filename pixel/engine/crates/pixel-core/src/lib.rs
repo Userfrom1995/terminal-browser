@@ -4,6 +4,7 @@ mod desc;
 mod engine;
 pub mod ghostty;
 mod herdr;
+mod hosted;
 mod image_cache;
 mod kitty;
 pub mod logging;
@@ -28,14 +29,14 @@ mod wrap;
 pub use canvas::{Canvas, measure_text};
 pub use desc::Desc;
 pub use engine::{
-    ChangeSource, DragPhase, Engine, EngineConfig, EngineEvent, FrameStats, HighlightArea, MarkRef,
-    px_for_cell_height,
+    ChangeSource, DragPhase, Engine, EngineConfig, EngineEvent, FrameStats, HighlightArea,
+    HostConfig, MarkRef, px_for_cell_height,
 };
 pub use kitty::kitty_transmit;
 pub use logging::{LogEntry, LogLevel};
 pub use menu::{CONTEXT_MENU_KEY, MenuEntry, MenuItem, MenuStyle, context_menu};
 pub use native::{NativeEvent, NativeScroll};
-pub use terminal::SessionEnv;
+pub use terminal::{Retarget, SessionEnv};
 pub use paint::paint;
 pub use profiler::{CounterRecord, ProfileData, Profiler, SpanRecord};
 pub use shape::{LineCap, LineJoin, PathCmd, ShapeProps, ShapeStroke, build_path, parse_path_data, skia_stroke};

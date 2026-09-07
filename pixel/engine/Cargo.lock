@@ -777,6 +777,7 @@ dependencies = [
  "miniz_oxide",
  "rayon",
  "rustix",
+ "serde_json",
  "taffy",
  "tiny-skia",
 ]

@@ -11,4 +11,10 @@ const root = createRoot({
   },
 });
 
-root.render(<WebView src={url} style={{ width: "100%", height: "100%" }} />);
+root.render(
+  <WebView
+    src={url}
+    style={{ width: "100%", height: "100%" }}
+    onState={(state) => root.setTitle(state.title || state.url)}
+  />,
+);

@@ -1,7 +1,7 @@
 import Reconciler from "react-reconciler";
 import { DefaultEventPriority } from "react-reconciler/constants";
 
-import { createNativeEngine, NativeEngine } from "./native";
+import { createNativeEngine, HostOptions, NativeEngine } from "./native";
 import { Color, parseColor, serializeStyle, Style } from "./styles";
 import { Surface, surfaceId } from "./surface";
 
@@ -78,6 +78,8 @@ export interface ContainerSelection {
 export interface BoxProps {
   style?: Style;
   id?: string;
+  /** [placeholder copy: Lays the box out as nothing and paints none of it, keeping its children mounted.] */
+  hidden?: boolean;
   onClick?: (event: ClickEvent) => void;
   onClickOutside?: (event: ClickEvent) => void;
   onScroll?: (event: ScrollEvent) => void;
@@ -262,12 +264,13 @@ export class Bridge {
   containers: Array<Container | null> = [null, null];
   onFlush: ((sample: FlushSample) => void) | null = null;
   onTreeMutation: ((view: number) => void) | null = null;
+  afterCommit: ((view: number) => void) | null = null;
   private queues: Op[][] = [[], []];
   private nextId = 1;
   private seq = 0;
 
-  constructor(tty?: string, wrapper?: string, sessionEnv?: NodeJS.ProcessEnv) {
-    this.engine = createNativeEngine(tty, wrapper, sessionEnv);
+  constructor(tty?: string, wrapper?: string, sessionEnv?: NodeJS.ProcessEnv, host?: HostOptions) {
+    this.engine = createNativeEngine(tty, wrapper, sessionEnv, host);
     if (!defaultBridge) defaultBridge = this;
   }
 
@@ -668,6 +671,7 @@ const hostConfig = {
 
   resetAfterCommit(container: Container) {
     container.bridge.flush();
+    container.bridge.afterCommit?.(container.view);
   },
 
   preparePortalMount() {},

@@ -60,7 +60,16 @@ export interface EngineInfo {
   cellHeight: number;
   basePx: number;
   kittyKeyboard: boolean;
+  hosted: boolean;
   colors: TerminalColors;
+}
+
+export interface HostOptions {
+  socket: string;
+  pane: string;
+  name: string;
+  /** [placeholder copy: Set when the host is not terminal-electron: frames are drawn into this terminal as kitty virtual placements the host positions.] */
+  tty?: string;
 }
 
 export interface HighlightSpan {
@@ -146,6 +155,7 @@ const binding = loadBinding() as {
     tty?: string,
     wrapper?: string,
     sessionEnv?: Record<string, string>,
+    host?: HostOptions,
   ) => NativeEngine;
   highlight(source: string, language: string): HighlightSpan[];
   highlightCaptures(): string[];
@@ -168,6 +178,7 @@ export function createNativeEngine(
   tty?: string,
   wrapper?: string,
   sessionEnv?: NodeJS.ProcessEnv,
+  host?: HostOptions,
 ): NativeEngine {
   const env = sessionEnv
     ? Object.fromEntries(
@@ -176,7 +187,7 @@ export function createNativeEngine(
         ),
       )
     : undefined;
-  const pixelEngine = new binding.PixelEngine(tty, wrapper, env);
+  const pixelEngine = new binding.PixelEngine(tty, wrapper, env, host);
 
   return pixelEngine
 }

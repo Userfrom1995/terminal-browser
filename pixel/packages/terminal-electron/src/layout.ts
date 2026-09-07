@@ -7,9 +7,9 @@ import type { NodeHandle } from "./react";
 import type { ViewRegistry } from "./registry";
 import type { Rect } from "./devtools-layout";
 
-// The engine answers a queryLayout op with every node's rect. Asking after each
-// commit and each terminal resize keeps a node's rect current without the
-// engine having to know which nodes care.
+// The engine answers a queryLayout op with every node's rect. The root asks
+// after each commit and each terminal resize, so a node's rect stays current
+// without the engine having to know which nodes care.
 export function useNodeRect(node: RefObject<NodeHandle | null>, registry: ViewRegistry): Rect | null {
   const [rect, setRect] = useState<Rect | null>(null);
   // subscribed before the query below goes out, or the reply can land first and be missed
@@ -34,9 +34,6 @@ export function useNodeRect(node: RefObject<NodeHandle | null>, registry: ViewRe
       }),
     [node, registry],
   );
-  useLayoutEffect(() => {
-    registry.queryLayout();
-  });
   useEffect(() => {
     const ask = () => registry.queryLayout();
     registry.resizeListeners.add(ask);

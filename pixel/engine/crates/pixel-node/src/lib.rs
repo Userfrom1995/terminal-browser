@@ -8,7 +8,6 @@ mod markdown;
 mod mend;
 mod ops;
 mod record;
-#[cfg(target_os = "linux")]
 mod shm;
 mod surface;
 
@@ -174,7 +173,6 @@ fn draw_frame(
                 locked.stride,
             )
         }
-        #[cfg(target_os = "linux")]
         SurfacePixels::Shm(surface) => {
             let len = surface.stride * surface.height as usize;
             draw_pixels(
@@ -208,7 +206,14 @@ fn draw_pixels(
         .map_err(|error| error.to_string())
 }
 
-#[cfg(target_os = "linux")]
+#[napi(object)]
+pub struct HostOptions {
+    pub socket: String,
+    pub pane: String,
+    pub name: String,
+    pub tty: Option<String>,
+}
+
 #[napi(object)]
 pub struct SurfaceShm {
     pub fd: i32,
@@ -245,7 +250,6 @@ const SYSTEM_UI_FONTS: &[&str] = &[
     "/System/Library/Fonts/SFNSRounded.ttf",
     "/System/Library/Fonts/SFNS.ttf",
 ];
-const SYSTEM_MONO_FONTS: &[&str] = &["/System/Library/Fonts/SFNSMono.ttf"];
 
 fn load_font(candidates: &[&str], fallback: &'static [u8]) -> fontdue::Font {
     let parse = |bytes: &[u8]| fontdue::Font::from_bytes(bytes, fontdue::FontSettings::default());
@@ -269,6 +273,21 @@ struct SendEngine(Engine);
 
 #[allow(unsafe_code)]
 unsafe impl Send for SendEngine {}
+
+pub(crate) fn engine_info(engine: &Engine) -> serde_json::Value {
+    let (width, height) = engine.comp.window;
+    let (cell_w, cell_h) = engine.cell;
+    json!({
+        "width": width,
+        "height": height,
+        "cellWidth": cell_w,
+        "cellHeight": cell_h,
+        "basePx": engine.base_px,
+        "kittyKeyboard": engine.term.kitty_keyboard(),
+        "hosted": engine.term.is_hosted(),
+        "colors": colors_json(&engine.colors),
+    })
+}
 
 pub(crate) fn colors_json(colors: &TerminalColors) -> serde_json::Value {
     json!({
@@ -299,10 +318,13 @@ impl PixelEngine {
         tty: Option<String>,
         wrapper: Option<String>,
         session_env: Option<std::collections::HashMap<String, String>>,
+        host: Option<HostOptions>,
     ) -> Result<Self> {
+        // index 0 is what text renders in unless a node picks another font, so it is
+        // the bundled mono face regardless of what the OS ships
         let fonts = vec![
+            load_font(&[], MONO_FONT_BYTES),
             load_font(SYSTEM_UI_FONTS, UI_FONT_BYTES),
-            load_font(SYSTEM_MONO_FONTS, MONO_FONT_BYTES),
         ];
         let session_env = match session_env {
             Some(env) => pixel_core::SessionEnv::of_session(env),
@@ -310,27 +332,22 @@ impl PixelEngine {
         };
         let mut engine = Engine::new(EngineConfig {
             fonts,
-            cell_metrics_font: 1,
+            cell_metrics_font: 0,
             watch_resize: false,
             tty,
+            host: host.map(|host| pixel_core::HostConfig {
+                socket: host.socket,
+                pane: host.pane,
+                name: host.name,
+                tty: host.tty,
+            }),
             wrapper: pixel_core::wrapper::Wrapper::named(wrapper.as_deref()),
             session_env,
         })
         .map_err(err)?;
         let waker = engine.term.waker().map_err(err)?;
         engine.cpu_throttle.register_current_thread();
-        let (width, height) = engine.comp.window;
-        let (cell_w, cell_h) = engine.cell;
-        let info = json!({
-            "width": width,
-            "height": height,
-            "cellWidth": cell_w,
-            "cellHeight": cell_h,
-            "basePx": engine.base_px,
-            "kittyKeyboard": engine.term.kitty_keyboard(),
-            "colors": colors_json(&engine.colors),
-        })
-        .to_string();
+        let info = engine_info(&engine).to_string();
         let (tx, rx) = channel();
         Ok(Self {
             engine: Some(engine),
@@ -620,7 +637,6 @@ impl PixelEngine {
     }
 }
 
-#[cfg(target_os = "linux")]
 #[napi]
 impl PixelEngine {
     #[napi]

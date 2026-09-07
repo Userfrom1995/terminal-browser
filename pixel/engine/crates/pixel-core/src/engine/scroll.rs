@@ -273,6 +273,40 @@ impl Engine {
         self.touch_bar(view, node);
     }
 
+    // A host delivered trackpad deltas it had already paired, so they go where
+    // paired native deltas go, without any pairing of our own.
+    pub(super) fn forwarded_wheel(
+        &mut self,
+        point: (f32, f32),
+        delta: (f32, f32),
+        mods: Mods,
+        out: &mut Vec<EngineEvent>,
+    ) {
+        let view = self.comp.view_at(point.0);
+        self.mark_scroll(view);
+        let local = self.comp.to_local(view, point);
+        if self.emit_wheel(view, local, delta.0, delta.1, true, mods, out) {
+            return;
+        }
+        let Some(area) = self.comp.views[view].tree.scroll_area_at(local.0, local.1) else {
+            return;
+        };
+        let (node, max) = (area.node, area.max_scroll());
+        let mut moved = false;
+        if let Some(state) = self.comp.views[view].tree.scroll_state_mut(node) {
+            let next = (state.position + delta.1).clamp(0.0, max);
+            if next != state.position {
+                state.position = next;
+                moved = true;
+            }
+            state.set_target(next);
+        }
+        if moved {
+            self.comp.views[view].tree.mark_place();
+        }
+        self.touch_bar(view, node);
+    }
+
     pub(super) fn step_scrolls(&mut self, dt: f32) {
         let profile = self.profile;
         for view in self.comp.active_views() {

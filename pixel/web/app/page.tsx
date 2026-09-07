@@ -20,13 +20,8 @@ export default function Home() {
       </div>
 
       <div className="mt-8 flex flex-wrap items-center gap-5 text-[14px]">
-        <a
-          href={`${GITHUB}#readme`}
-          target="_blank"
-          rel="noreferrer"
-          className="font-medium text-text"
-        >
-          [placeholder copy: Read the docs] ↗
+        <a href="/docs" className="font-medium text-text">
+          [placeholder copy: Read the docs] →
         </a>
         <a
           href={`${GITHUB}/tree/main/examples`}

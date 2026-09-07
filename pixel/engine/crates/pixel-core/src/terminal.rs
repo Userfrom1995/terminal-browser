@@ -7,8 +7,18 @@ use crate::canvas::Canvas;
 use crate::wrapper::Wrapper;
 use crate::kitty::Placement;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Event {
+    HostClosed,
+    Handoff(Handoff),
+    // Precise scroll deltas a host already paired with its trackpad, in pixels.
+    Wheel {
+        x: u32,
+        y: u32,
+        delta_x: f32,
+        delta_y: f32,
+        mods: Mods,
+    },
     Key(KeyEvent),
     Mouse(Mouse),
     Paste(String),
@@ -20,6 +30,25 @@ pub enum Event {
     },
     ColorSchemeChanged,
     Colors(TerminalColors),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Handoff {
+    Adopt { tty: String },
+    Rejoin { socket: String },
+}
+
+#[derive(Debug, Clone)]
+pub enum Retarget {
+    Tty {
+        path: String,
+        wrapper: Wrapper,
+    },
+    Host {
+        socket: String,
+        pane: String,
+        name: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -205,6 +234,19 @@ enum TtyHandle {
         stdout: io::Stdout,
     },
     File(std::fs::File),
+    // A guest of another terminal-electron process: events arrive on the
+    // socket and every escape sequence we would have written is dropped.
+    Hosted {
+        stream: std::os::unix::net::UnixStream,
+        sink: io::Sink,
+    },
+    // A guest of a program that is not terminal-electron: events still arrive on
+    // the socket, but frames go to the terminal as kitty virtual placements the
+    // host lays out with placeholder cells.
+    Embedded {
+        stream: std::os::unix::net::UnixStream,
+        tty: std::fs::File,
+    },
 }
 
 impl TtyHandle {
@@ -213,6 +255,8 @@ impl TtyHandle {
         match self {
             TtyHandle::Stdio { stdin, .. } => stdin.as_fd(),
             TtyHandle::File(file) => file.as_fd(),
+            TtyHandle::Hosted { stream, .. } => stream.as_fd(),
+            TtyHandle::Embedded { stream, .. } => stream.as_fd(),
         }
     }
 
@@ -220,13 +264,16 @@ impl TtyHandle {
         match self {
             TtyHandle::Stdio { stdout, .. } => stdout,
             TtyHandle::File(file) => file,
+            TtyHandle::Hosted { sink, .. } => sink,
+            TtyHandle::Embedded { tty, .. } => tty,
         }
     }
 }
 
 pub struct Terminal {
     io: TtyHandle,
-    saved: Termios,
+    saved: Option<Termios>,
+    hosted: Option<crate::hosted::HostState>,
     last_frame_size: Option<(u32, u32)>,
     mouse_pixels: bool,
     focused: bool,
@@ -350,11 +397,90 @@ impl Terminal {
         Self::with_handle(TtyHandle::File(file), wrapper, env)
     }
 
+    pub fn join_host(socket: &str, pane: &str, name: &str) -> io::Result<Self> {
+        let crate::hosted::Joined {
+            stream,
+            state,
+            pending,
+        } = crate::hosted::join(socket, pane, name)?;
+        let target = crate::herdr::HerdrTarget {
+            pane: pane.to_string(),
+            socket: socket.to_string(),
+        };
+        let io = TtyHandle::Hosted {
+            stream,
+            sink: io::sink(),
+        };
+        let mut terminal = Self::blank(io, None, Wrapper::None, Some(target));
+        terminal.focused = state.focused;
+        terminal.hosted = Some(state);
+        terminal.pending = pending;
+        terminal.kitty_keyboard = true;
+        terminal.mouse_pixels = true;
+        terminal.connect_herdr();
+        if terminal.herdr.is_none() {
+            return Err(io::Error::other("host did not accept the frame stream"));
+        }
+        Ok(terminal)
+    }
+
+    pub fn is_hosted(&self) -> bool {
+        self.hosted.is_some()
+    }
+
+    pub fn join_embedded(socket: &str, pane: &str, name: &str, tty_path: &str) -> io::Result<Self> {
+        let crate::hosted::Joined {
+            stream,
+            state,
+            pending,
+        } = crate::hosted::join(socket, pane, name)?;
+        let tty = std::fs::File::options().write(true).open(tty_path)?;
+        let mut terminal = Self::blank(TtyHandle::Embedded { stream, tty }, None, Wrapper::None, None);
+        terminal.transport = match state.transport.as_deref() {
+            Some("file") => FrameTransport::File,
+            Some("shm") | Some("shared") => FrameTransport::Shared,
+            _ => FrameTransport::Inline,
+        };
+        terminal.image_id = state.image_id.unwrap_or_else(|| frame_image_id(true));
+        terminal.cell = state.cell;
+        terminal.focused = state.focused;
+        terminal.hosted = Some(state);
+        terminal.pending = pending;
+        terminal.kitty_keyboard = true;
+        terminal.mouse_pixels = true;
+        // The host relays what the terminal answers, so it can be asked directly.
+        terminal.color_scheme_updates = true;
+        terminal.io.out().write_all(b"\x1b[?2031h")?;
+        terminal.io.out().flush()?;
+        terminal.request_colors()?;
+        Ok(terminal)
+    }
+
+    pub fn is_embedded(&self) -> bool {
+        matches!(self.io, TtyHandle::Embedded { .. })
+    }
+
+    // Swaps what this terminal draws to and reads from, keeping the waker so the
+    // engine's existing handles still wake the new backend.
+    pub fn retarget(&mut self, target: Retarget, env: SessionEnv) -> io::Result<()> {
+        let mut fresh = match target {
+            Retarget::Tty { path, wrapper } => Terminal::open(&path, wrapper, env)
+                .map_err(|e| io::Error::new(e.kind(), format!("open {path}: {e}")))?,
+            Retarget::Host { socket, pane, name } => Terminal::join_host(&socket, &pane, &name)?,
+        };
+        fresh.wake_rx = self.wake_rx.take();
+        fresh.waker = self.waker.take();
+        fresh.resize_slot = self.resize_slot.take();
+        *self = fresh;
+        Ok(())
+    }
+
     fn with_handle(mut io: TtyHandle, wrapper: Wrapper, env: SessionEnv) -> io::Result<Self> {
-        let saved = retry_intr(|| termios::tcgetattr(&io.read_fd()))?;
+        let step = |name: &str, error: io::Error| io::Error::new(error.kind(), format!("{name}: {error}"));
+        let saved = retry_intr(|| termios::tcgetattr(&io.read_fd())).map_err(|e| step("tcgetattr", e.into()))?;
         let mut raw = saved.clone();
         raw.make_raw();
-        retry_intr(|| termios::tcsetattr(&io.read_fd(), OptionalActions::Drain, &raw))?;
+        retry_intr(|| termios::tcsetattr(&io.read_fd(), OptionalActions::Drain, &raw)).map_err(|e| step("tcsetattr", e.into()))?;
 
         // would prefer if they weren't magic and linked to some known doc on the internet
         io.out().write_all(
@@ -362,35 +488,12 @@ impl Terminal {
         )?; // enable many reporting modes so we get info about mouse/keyboard
         io.out().flush()?;
 
-        let mut terminal = Self {
+        let mut terminal = Self::blank(
             io,
-            saved,
-            last_frame_size: None,
-            mouse_pixels: false,
-            focused: true,
-            cell: None,
-            cell_query_unsupported: false,
-            pending: Vec::new(),
-            lone_escape_since: None,
-            transport: FrameTransport::Inline,
-            herdr: None,
-            herdr_target: crate::herdr::HerdrTarget::from_env(&env),
-            herdr_retry: None,
-            frame_files: Vec::new(),
-            frame_seq: 0,
+            Some(saved),
             wrapper,
-            image_id: frame_image_id(wrapper.relayed()),
-            placeholders: None,
-            wake_rx: None,
-            waker: None,
-            resize_slot: None,
-            terminal_id: NEXT_TERMINAL_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
-            clipboard_data: false,
-            clip_read: None,
-            color_scheme_updates: false,
-            color_query: None,
-            kitty_keyboard: false,
-        };
+            crate::herdr::HerdrTarget::from_env(&env),
+        );
         terminal.kitty_keyboard = terminal.probe_kitty_keyboard()?;
         if !terminal.kitty_keyboard {
             terminal.io.out().write_all(b"\x1b[>4;2m")?;
@@ -411,8 +514,55 @@ impl Terminal {
         Ok(terminal)
     }
 
+    fn blank(
+        io: TtyHandle,
+        saved: Option<Termios>,
+        wrapper: Wrapper,
+        herdr_target: Option<crate::herdr::HerdrTarget>,
+    ) -> Self {
+        Self {
+            io,
+            saved,
+            hosted: None,
+            last_frame_size: None,
+            mouse_pixels: false,
+            focused: true,
+            cell: None,
+            cell_query_unsupported: false,
+            pending: Vec::new(),
+            lone_escape_since: None,
+            transport: FrameTransport::Inline,
+            herdr: None,
+            herdr_target,
+            herdr_retry: None,
+            frame_files: Vec::new(),
+            frame_seq: 0,
+            wrapper,
+            image_id: frame_image_id(wrapper.relayed()),
+            placeholders: None,
+            wake_rx: None,
+            waker: None,
+            resize_slot: None,
+            terminal_id: NEXT_TERMINAL_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            clipboard_data: false,
+            clip_read: None,
+            color_scheme_updates: false,
+            color_query: None,
+            kitty_keyboard: false,
+        }
+    }
+
+    fn host_send(&mut self, message: serde_json::Value) -> io::Result<()> {
+        match &mut self.io {
+            TtyHandle::Hosted { stream, .. } | TtyHandle::Embedded { stream, .. } => {
+                crate::hosted::send(stream, &message)
+            }
+            _ => Ok(()),
+        }
+    }
+
     pub fn reports_color_scheme(&self) -> bool {
-        self.color_scheme_updates
+        self.color_scheme_updates || self.hosted.is_some()
     }
 
     pub fn relayed(&self) -> bool {
@@ -424,6 +574,9 @@ impl Terminal {
     }
 
     pub fn set_key_event_types(&mut self, enabled: bool) -> io::Result<()> {
+        if self.hosted.is_some() {
+            return Ok(());
+        }
         self.io.out().write_all(b"\x1b[<u")?;
         self.io.out()
             .write_all(if enabled { b"\x1b[>27u" } else { b"\x1b[>1u" })?;
@@ -557,6 +710,20 @@ impl Terminal {
     }
 
     pub fn draw(&mut self, canvas: &Canvas) -> io::Result<usize> {
+        let embedded = self.is_embedded();
+        if let Some(state) = &self.hosted {
+            if state.closed {
+                return Ok(0);
+            }
+            if embedded {
+                return self.draw_embedded(canvas);
+            }
+            let herdr = self
+                .herdr
+                .as_mut()
+                .ok_or_else(|| io::Error::other("host frame stream is gone"))?;
+            return herdr.present(canvas);
+        }
         if self.herdr.is_none()
             && let Some((at, backoff)) = self.herdr_retry
             && Instant::now() >= at
@@ -657,6 +824,56 @@ impl Terminal {
         Ok(frame.len())
     }
 
+    // The host owns the screen, so only the image itself is sent: a virtual
+    // placement the host shows by printing placeholder cells wherever it likes.
+    fn draw_embedded(&mut self, canvas: &Canvas) -> io::Result<usize> {
+        let shrank = self
+            .last_frame_size
+            .is_some_and(|(w, h)| canvas.width < w || canvas.height < h);
+        self.last_frame_size = Some((canvas.width, canvas.height));
+        let (cols, rows) = self.grid_for(canvas);
+        let placement = Placement::Cells { cols, rows };
+        let mut frame = Vec::new();
+        if shrank {
+            frame.extend_from_slice(&crate::kitty::kitty_delete_one(self.image_id));
+        }
+        if let Some(medium) = match self.transport {
+            FrameTransport::File => Some(crate::kitty::Medium::File),
+            FrameTransport::Shared => Some(crate::kitty::Medium::Shared),
+            FrameTransport::Inline => None,
+        } {
+            let name = match self.transport {
+                FrameTransport::File => self.write_frame_file(&canvas.pixels)?,
+                _ => self.write_shm_frame(&canvas.pixels)?,
+            };
+            frame.extend_from_slice(&crate::kitty::kitty_transmit_named(
+                self.image_id,
+                canvas.width,
+                canvas.height,
+                &name,
+                medium,
+                placement,
+                Wrapper::None,
+            ));
+        } else {
+            frame.extend_from_slice(&crate::kitty::kitty_transmit_placed(
+                self.image_id,
+                canvas.width,
+                canvas.height,
+                &canvas.pixels,
+                placement,
+                Wrapper::None,
+            ));
+        }
+        self.io.out().write_all(&frame)?;
+        self.io.out().flush()?;
+        if self.placeholders != Some((cols, rows)) {
+            self.placeholders = Some((cols, rows));
+            self.host_send(crate::hosted::placed(self.image_id, cols, rows))?;
+        }
+        Ok(frame.len())
+    }
+
     fn grid_for(&self, canvas: &Canvas) -> (u32, u32) {
         let (cw, ch) = self
             .cell
@@ -676,6 +893,9 @@ impl Terminal {
     }
 
     pub fn poll_event(&mut self, timeout: Option<Duration>) -> io::Result<Option<Event>> {
+        if self.hosted.is_some() {
+            return self.poll_host_event(timeout);
+        }
         let deadline = timeout.map(|t| Instant::now() + t);
         loop {
             if let Some((raw, used)) = parse_event_kitty(&self.pending, self.kitty_keyboard) {
@@ -753,6 +973,116 @@ impl Terminal {
             }
             self.pending.extend_from_slice(&chunk[..n]);
         }
+    }
+
+    fn poll_host_event(&mut self, timeout: Option<Duration>) -> io::Result<Option<Event>> {
+        let deadline = timeout.map(|t| Instant::now() + t);
+        if self.hosted.as_ref().is_some_and(|state| state.closed) {
+            self.wait_for_wake(timeout)?;
+            return Ok(None);
+        }
+        loop {
+            if let Some(event) = self.relayed_event() {
+                return Ok(Some(event));
+            }
+            while let Some(end) = self.pending.iter().position(|&b| b == b'\n') {
+                let line: Vec<u8> = self.pending.drain(..=end).collect();
+                let Some(state) = self.hosted.as_mut() else {
+                    return Ok(None);
+                };
+                if let Some(event) = crate::hosted::parse_line(&line, state) {
+                    match event {
+                        Event::Focus(focused) => self.focused = focused,
+                        // A new size means the host redrew; it needs to hear where
+                        // the image sits again, and a new cell size if it sent one.
+                        Event::WindowSize(_) => {
+                            if state.cell.is_some() {
+                                self.cell = state.cell;
+                            }
+                            self.placeholders = None;
+                        }
+                        _ => {}
+                    }
+                    return Ok(Some(event));
+                }
+                if let Some(event) = self.relayed_event() {
+                    return Ok(Some(event));
+                }
+            }
+            let color_deadline = self.color_query.as_ref().map(ColorQuery::deadline);
+            let until = [deadline, color_deadline].into_iter().flatten().min();
+            let wait = until.map(|d| d.saturating_duration_since(Instant::now()));
+            // A wake or a timeout both hand control back to the engine; only a
+            // colour query that ran out of replies has something to say first.
+            if !self.wait_for_input(wait)? {
+                if color_deadline.is_some_and(|d| Instant::now() >= d)
+                    && let Some(colors) = self.take_settled_colors()
+                {
+                    return Ok(Some(Event::Colors(colors)));
+                }
+                return Ok(None);
+            }
+            let mut chunk = [0u8; 4096];
+            let n = match rustix::io::read(self.io.read_fd(), &mut chunk) {
+                Ok(n) => n,
+                Err(rustix::io::Errno::INTR) => continue,
+                Err(e) => return Err(e.into()),
+            };
+            if n == 0 {
+                if let Some(state) = self.hosted.as_mut() {
+                    state.closed = true;
+                }
+                self.pending.clear();
+                return Ok(Some(Event::HostClosed));
+            }
+            self.pending.extend_from_slice(&chunk[..n]);
+        }
+    }
+
+    // Replies the host relayed go through the same parser tty input does, but
+    // only what a query could have asked for is acted on.
+    fn relayed_event(&mut self) -> Option<Event> {
+        let mut buf = std::mem::take(&mut self.hosted.as_mut()?.relayed);
+        let mut found = None;
+        while found.is_none() {
+            let Some((raw, used)) = parse_event_kitty(&buf, true) else {
+                break;
+            };
+            buf.drain(..used);
+            found = match raw {
+                RawEvent::Color(slot, rgba) => self.collect_color(slot, rgba).map(Event::Colors),
+                RawEvent::ColorSchemeChanged => Some(Event::ColorSchemeChanged),
+                _ => None,
+            };
+        }
+        if let Some(state) = self.hosted.as_mut() {
+            state.relayed = buf;
+        }
+        found
+    }
+
+    fn wait_for_wake(&self, wait: Option<Duration>) -> io::Result<()> {
+        let Some(wake) = &self.wake_rx else {
+            std::thread::sleep(wait.unwrap_or(Duration::from_millis(50)));
+            return Ok(());
+        };
+        let timeout = match wait {
+            Some(w) => Some(
+                rustix::event::Timespec::try_from(w)
+                    .map_err(|_| io::Error::other("timeout out of range"))?,
+            ),
+            None => None,
+        };
+        let mut fds = [rustix::event::PollFd::new(wake, rustix::event::PollFlags::IN)];
+        match rustix::event::poll(&mut fds, timeout.as_ref()) {
+            Ok(_) | Err(rustix::io::Errno::INTR) => {}
+            Err(e) => return Err(e.into()),
+        }
+        if fds[0].revents().contains(rustix::event::PollFlags::IN) {
+            let mut sink = [0u8; 64];
+            while matches!(rustix::io::read(wake, &mut sink), Ok(n) if n > 0) {}
+        }
+        Ok(())
     }
 
     fn lone_escape_deadline(&mut self) -> Option<Instant> {
@@ -845,6 +1175,9 @@ impl Terminal {
     }
 
     pub fn size(&self) -> io::Result<WindowSize> {
+        if let Some(state) = &self.hosted {
+            return Ok(state.size);
+        }
         let ws = retry_intr(|| termios::tcgetwinsize(&self.io.read_fd()))?;
         Ok(WindowSize {
             cols: u32::from(ws.ws_col),
@@ -890,6 +1223,9 @@ impl Terminal {
     }
 
     pub fn query_colors(&mut self) -> io::Result<TerminalColors> {
+        if let Some(state) = &self.hosted {
+            return Ok(state.colors);
+        }
         let query = Self::color_queries();
         self.io.out().write_all(&query)?;
         self.io.out().flush()?;
@@ -969,6 +1305,9 @@ impl Terminal {
     }
 
     pub fn request_colors(&mut self) -> io::Result<()> {
+        if self.hosted.is_some() && !self.is_embedded() {
+            return Ok(());
+        }
         let query = Self::color_queries();
         self.io.out().write_all(&query)?;
         self.io.out().flush()?;
@@ -1027,12 +1366,33 @@ impl Terminal {
         if !shape.bytes().all(|b| b.is_ascii_lowercase() || b == b'-') {
             return Ok(());
         }
+        if self.hosted.is_some() {
+            self.host_send(crate::hosted::pointer(shape))?;
+            // A foreign host lent us its terminal for drawing, so the shape can be
+            // set directly; the host hears about it to reset when the mouse leaves.
+            if !self.is_embedded() {
+                return Ok(());
+            }
+        }
         self.io.out()
             .write_all(format!("\x1b]22;{shape}\x1b\\").as_bytes())?;
         self.io.out().flush()
     }
 
+    pub fn set_title(&mut self, text: &str) -> io::Result<()> {
+        if self.hosted.is_some() {
+            return self.host_send(crate::hosted::title(text));
+        }
+        let text: String = text.chars().filter(|c| !c.is_control()).collect();
+        self.io.out()
+            .write_all(format!("\x1b]2;{text}\x1b\\").as_bytes())?;
+        self.io.out().flush()
+    }
+
     pub fn set_clipboard(&mut self, text: &str) -> io::Result<()> {
+        if self.hosted.is_some() {
+            return self.host_send(crate::hosted::clipboard(text));
+        }
         use base64::Engine as _;
         let payload = base64::engine::general_purpose::STANDARD.encode(text);
         self.io.out()
@@ -1042,6 +1402,9 @@ impl Terminal {
 
     // this will trigger a prompt or just not work
     pub fn request_clipboard(&mut self) -> io::Result<()> {
+        if self.hosted.is_some() {
+            return Ok(());
+        }
         self.io.out().write_all(b"\x1b]52;c;?\x1b\\")?;
         self.io.out().flush()
     }
@@ -1059,6 +1422,9 @@ impl Terminal {
     }
 
     fn request_clipboard_mimes(&mut self, mimes: &str) -> io::Result<()> {
+        if self.hosted.is_some() {
+            return Ok(());
+        }
         use base64::Engine as _;
         self.clip_read = None;
         let payload = base64::engine::general_purpose::STANDARD.encode(mimes);
@@ -1184,6 +1550,23 @@ impl FrameFile {
         unsafe { std::ptr::copy_nonoverlapping(data.as_ptr(), self.map.as_ptr(), self.len) };
     }
 
+    pub(crate) fn write_bgra(&mut self, data: &[u8]) {
+        use rayon::prelude::*;
+        let len = self.len.min(data.len());
+        let target = unsafe { std::slice::from_raw_parts_mut(self.map.as_ptr(), len) };
+        target
+            .par_chunks_mut(1 << 16)
+            .zip(data[..len].par_chunks(1 << 16))
+            .for_each(|(target, source)| {
+                for (t, s) in target.chunks_exact_mut(4).zip(source.chunks_exact(4)) {
+                    t[0] = s[2];
+                    t[1] = s[1];
+                    t[2] = s[0];
+                    t[3] = s[3];
+                }
+            });
+    }
+
     pub(crate) fn len(&self) -> usize {
         self.len
     }
@@ -1231,6 +1614,12 @@ impl Drop for Terminal {
         if let Some(slot) = self.resize_slot.take() {
             RESIZE_WAKE_FDS[slot].store(-1, std::sync::atomic::Ordering::Release);
         }
+        if self.is_embedded() {
+            // The host keeps its terminal; only our image goes.
+            let _ = self.io.out().write_all(&crate::kitty::kitty_delete_one(self.image_id));
+            let _ = self.io.out().flush();
+            return;
+        }
         for slot in 0..FRAME_SLOTS {
             let _ = rustix::shm::unlink(self.shm_name(slot));
         }
@@ -1246,9 +1635,11 @@ impl Drop for Terminal {
             b"\x1b[<u\x1b[?2048l\x1b[?2004l\x1b[?1004l\x1b[?1016l\x1b[?1006l\x1b[?1003l\x1b[?25h\x1b[?1049l",
         );
         let _ = self.io.out().flush();
-        let _ = retry_intr(|| {
-            termios::tcsetattr(&self.io.read_fd(), OptionalActions::Flush, &self.saved)
-        });
+        if let Some(saved) = &self.saved {
+            let _ = retry_intr(|| {
+                termios::tcsetattr(&self.io.read_fd(), OptionalActions::Flush, saved)
+            });
+        }
     }
 }
 

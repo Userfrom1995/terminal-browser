@@ -50,6 +50,13 @@ impl IdMap {
 }
 
 #[derive(Deserialize)]
+pub struct RetargetHost {
+    socket: String,
+    pane: String,
+    name: String,
+}
+
+#[derive(Deserialize)]
 #[serde(tag = "op", rename_all = "camelCase")]
 enum Op {
     Create {
@@ -128,6 +135,14 @@ enum Op {
     },
     SetPointerShape {
         shape: String,
+    },
+    SetTitle {
+        text: String,
+    },
+    Retarget {
+        tty: Option<String>,
+        wrapper: Option<String>,
+        host: Option<RetargetHost>,
     },
     InputSplice {
         id: u32,
@@ -837,6 +852,38 @@ fn apply_op(
         Op::SetKeyCapture { keys } => engine.key_capture = keys,
         Op::SetPointerShape { shape } => {
             let _ = engine.term.set_pointer_shape(&shape);
+        }
+        Op::SetTitle { text } => engine.set_title(&text),
+        Op::Retarget { tty, wrapper, host } => {
+            use serde_json::json;
+            let target = match (host, tty) {
+                (Some(host), _) => pixel_core::Retarget::Host {
+                    socket: host.socket,
+                    pane: host.pane,
+                    name: host.name,
+                },
+                (None, Some(path)) => pixel_core::Retarget::Tty {
+                    path,
+                    wrapper: pixel_core::wrapper::Wrapper::named(wrapper.as_deref()),
+                },
+                (None, None) => {
+                    replies.push(
+                        json!({ "type": "retargeted", "ok": false, "error": "retarget needs a tty or a host" })
+                            .to_string(),
+                    );
+                    return;
+                }
+            };
+            replies.push(match engine.retarget(target) {
+                Ok(()) => {
+                    json!({ "type": "retargeted", "ok": true, "info": crate::engine_info(engine) })
+                        .to_string()
+                }
+                Err(error) => {
+                    json!({ "type": "retargeted", "ok": false, "error": error.to_string() })
+                        .to_string()
+                }
+            });
         }
         Op::InputSplice {
             id,

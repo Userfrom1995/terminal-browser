@@ -64,8 +64,6 @@ export interface WebViewProps {
   /** [placeholder copy: Keep showing the last frame, stretched, while the view changes size instead of clearing to the background until the page repaints. Defaults to true.] */
   keepFrame?: boolean;
   onState?(state: WebViewState): void;
-  /** [placeholder copy: Called each time the page delivers a new frame.] */
-  onFrame?(): void;
   /** [placeholder copy: Observes pointer events on the page after they are delivered to it.] */
   onPointer?(event: PointerEvent): void;
   /** [placeholder copy: Replaces the default right click menu.] */
@@ -91,11 +89,18 @@ export interface WebViewHandle {
   openDevtools(): void;
   closeDevtools(): void;
   closePopup(): void;
+  /** [placeholder copy: Everything a screen recorder needs from this view.] */
+  readonly recording: WebViewRecording;
+}
+
+export interface WebViewRecording {
   /** [placeholder copy: Starts writing every frame the page paints into dir; stop() on the result ends it.] */
-  captureFrames(dir: string): SurfaceCapture;
+  start(dir: string): SurfaceCapture;
+  /** [placeholder copy: Called each time the page delivers a frame. Returns an unsubscribe function.] */
+  onFrame(listener: () => void): () => void;
+  frameSize(): { width: number; height: number } | null;
   /** [placeholder copy: Keeps the page painting at full rate even while hidden.] */
   pinFrameRate(pinned: boolean): void;
-  frameSize(): { width: number; height: number } | null;
   /** [placeholder copy: Asks the page to repaint everything.] */
   invalidate(): void;
 }
@@ -136,6 +141,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
   const dragging = useRef(false);
   const lastDragResize = useRef(0);
   const pendingInspect = useRef<{ x: number; y: number } | null>(null);
+  const frameListeners = useRef(new Set<() => void>());
 
   const [popup, setPopup] = useState<PopupView | null>(null);
   const [devtoolsOpen, setDevtoolsOpen] = useState(false);
@@ -284,7 +290,9 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
     host.onOpenWindow = (details) => propsRef.current.onOpenWindow?.(details) ?? "popup";
     host.onDownload = (progress) => propsRef.current.onDownload?.(progress);
     host.onQuit = () => registry.quit(entry);
-    host.onFrameSubmitted = () => propsRef.current.onFrame?.();
+    host.onFrameSubmitted = () => {
+      for (const listener of frameListeners.current) listener();
+    };
     host.setVisible(!initial.hidden);
     if (!initial.hidden && (initial.autoFocus ?? registry.views.size === 1)) registry.focus(entry);
     return () => {
@@ -299,14 +307,16 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // A zero rect means an ancestor is hidden; keep the page at its last size.
+  const collapsed = rect != null && (rect.width <= 0 || rect.height <= 0);
   useEffect(() => {
-    hostRef.current?.setVisible(!hidden);
-    if (hidden && registry.focused === entry) registry.blur(entry);
-  }, [hidden]);
+    hostRef.current?.setVisible(!hidden && !collapsed);
+    if ((hidden || collapsed) && registry.focused === entry) registry.blur(entry);
+  }, [hidden, collapsed]);
 
   useEffect(() => {
     const host = hostRef.current;
-    if (!host || !page || hidden) return;
+    if (!host || !page || hidden || collapsed) return;
     const layout: SurfaceLayout = { ...page, scale };
     debug("page resize", layout);
     host.resize(layout, { keepFrame: keepFrame() });
@@ -470,10 +480,18 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
         openDevtools: () => setDevtoolsOpen(true),
         closeDevtools: () => hostRef.current?.closeDevtools(),
         closePopup: () => hostRef.current?.popup?.close(),
-        captureFrames: (dir) => host().surface.startCapture(dir),
-        pinFrameRate: (pinned) => host().pinFrameRate(pinned),
-        frameSize: () => hostRef.current?.frameSize() ?? null,
-        invalidate: () => hostRef.current?.invalidate(),
+        recording: {
+          start: (dir) => host().surface.startCapture(dir),
+          onFrame: (listener) => {
+            frameListeners.current.add(listener);
+            return () => {
+              frameListeners.current.delete(listener);
+            };
+          },
+          frameSize: () => hostRef.current?.frameSize() ?? null,
+          pinFrameRate: (pinned) => host().pinFrameRate(pinned),
+          invalidate: () => hostRef.current?.invalidate(),
+        },
       };
       handleEntries.set(handle, entry);
       entry.handle = handle;

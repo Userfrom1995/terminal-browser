@@ -7,7 +7,6 @@ use pixel_core::surfaces::Rect;
 pub enum SurfacePixels {
     #[cfg(target_os = "macos")]
     IoSurface(crate::iosurface::RetainedSurface),
-    #[cfg(target_os = "linux")]
     Shm(crate::shm::ShmSurface),
     Owned {
         bgra: Vec<u8>,

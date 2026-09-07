@@ -156,6 +156,12 @@ pub fn event_json(event: &EngineEvent, engine: &Engine, ids: &[IdMap]) -> Option
             "type": "colors",
             "colors": crate::colors_json(colors),
         }),
+        EngineEvent::HostClosed => json!({ "type": "hostClosed" }),
+        EngineEvent::Handoff { tty, socket } => json!({
+            "type": "handoff",
+            "tty": tty,
+            "socket": socket,
+        }),
         EngineEvent::Inspect {
             view,
             node,

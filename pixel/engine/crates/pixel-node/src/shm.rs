@@ -135,10 +135,22 @@ mod tests {
     use std::io::Write;
     use std::os::fd::AsRawFd;
 
+    // A plain file maps the same way a shm region does, and exists on every platform.
     fn region(bytes: &[u8]) -> File {
-        let fd = rustix::fs::memfd_create("shm-test", rustix::fs::MemfdFlags::CLOEXEC)
-            .expect("memfd_create");
-        let mut file = File::from(fd);
+        static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let path = std::env::temp_dir().join(format!(
+            "pixel-shm-test-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ));
+        let _ = std::fs::remove_file(&path);
+        let mut file = File::options()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .expect("temp region");
+        let _ = std::fs::remove_file(&path);
         file.write_all(bytes).expect("write");
         file
     }

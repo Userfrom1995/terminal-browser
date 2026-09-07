@@ -12,7 +12,7 @@ import {
   reconciler,
 } from "./reconciler-config";
 import type { PasteSource, PastedImage, SelectionPart } from "./reconciler-config";
-import type { EngineInfo, TerminalColors } from "./native";
+import type { EngineInfo, HostOptions, TerminalColors } from "./native";
 import { Surface } from "./surface";
 import { handleDevtoolsKey } from "./devtools/app";
 import { installConsoleCapture } from "./devtools/console-capture";
@@ -90,6 +90,7 @@ export type {
   DiffRow,
   EngineInfo,
   HighlightSpan,
+  HostOptions,
   MarkdownBlock,
   MarkdownCell,
   MarkdownRow,
@@ -166,9 +167,12 @@ export interface RootOptions {
   onResize?: (size: { width: number; height: number; basePx: number }) => void;
   onColors?: (colors: TerminalColors) => void;
   onLayout?: (snapshot: LayoutSnapshot) => void;
+  onHostClosed?: () => void;
+  onHandoff?: (handoff: { tty?: string; socket?: string }) => void;
   keyEventTypes?: boolean;
   devtools?: boolean;
   tty?: string;
+  host?: HostOptions;
   wrapper?: "tmux";
   sessionEnv?: NodeJS.ProcessEnv;
 }
@@ -190,7 +194,11 @@ export interface PixelRoot {
   setKeyCapture(keys: string[]): void;
   requestClipboardImage(): void;
   setClipboard(text: string): void;
+  setTitle(text: string): void;
+  retarget(target: RetargetTarget): Promise<void>;
 }
+
+export type RetargetTarget = { tty: string; wrapper?: "tmux" } | { host: HostOptions };
 
 export interface SurfaceStats {
   submitted: number;
@@ -220,6 +228,10 @@ interface EngineEventJson {
   colors?: TerminalColors;
   message?: string;
   error?: string | null;
+  ok?: boolean;
+  info?: EngineInfo;
+  tty?: string | null;
+  socket?: string | null;
   path?: string;
   id?: number;
   cursor?: number;
@@ -262,9 +274,10 @@ function applyColors(colors: TerminalColors): void {
 }
 
 export function createRoot(options: RootOptions = {}): PixelRoot {
-  const bridge = options.tty
-    ? new Bridge(options.tty, options.wrapper, options.sessionEnv)
-    : getBridge(options.wrapper);
+  const bridge =
+    options.tty || options.host
+      ? new Bridge(options.tty, options.wrapper, options.sessionEnv, options.host)
+      : getBridge(options.wrapper);
   const devtoolsEnabled = options.devtools !== false && bridge === getBridge();
   if (devtoolsEnabled) {
     installConsoleCapture();
@@ -273,6 +286,15 @@ export function createRoot(options: RootOptions = {}): PixelRoot {
   const info = JSON.parse(bridge.engine.info()) as EngineInfo;
   applyColors(info.colors);
   bridge.engine.setKeyEventTypes(!!options.keyEventTypes);
+  // Any commit can move a node whose own component did not re-render, so the
+  // rects are re-asked for after every commit rather than per component.
+  if (options.onLayout) {
+    bridge.afterCommit = (view) => {
+      if (view !== APP_VIEW) return;
+      bridge.push(APP_VIEW, { op: "queryLayout" });
+      bridge.flush();
+    };
+  }
   const container: Container = { bridge, view: APP_VIEW, children: [] };
   bridge.containers[APP_VIEW] = container;
   const root = reconciler.createContainer(
@@ -310,6 +332,7 @@ export function createRoot(options: RootOptions = {}): PixelRoot {
     string,
     Array<{ resolve: (font: number) => void; reject: (error: Error) => void }>
   >();
+  const retargets: Array<{ resolve: () => void; reject: (error: Error) => void }> = [];
 
   const dispatch = (event: EngineEventJson) => {
     const view = event.view ?? APP_VIEW;
@@ -534,6 +557,23 @@ export function createRoot(options: RootOptions = {}): PixelRoot {
       case "error":
         engineLogs.push("error", "bridge", event.message ?? "unknown bridge error");
         break;
+      case "hostClosed":
+        options.onHostClosed?.();
+        break;
+      case "handoff":
+        options.onHandoff?.({ tty: event.tty ?? undefined, socket: event.socket ?? undefined });
+        break;
+      case "retargeted": {
+        const waiting = retargets.shift();
+        if (event.ok && event.info) {
+          Object.assign(info, event.info);
+          applyColors(info.colors);
+          waiting?.resolve();
+        } else {
+          waiting?.reject(new Error(event.error ?? "retarget failed"));
+        }
+        break;
+      }
       case "fontRegistered": {
         const pending = fontRequests.get(event.path!) ?? [];
         fontRequests.delete(event.path!);
@@ -585,7 +625,8 @@ export function createRoot(options: RootOptions = {}): PixelRoot {
    * fixme: node types?
    */
   const forwardResize = () => bridge.engine.applyOps(JSON.stringify({ view: 0, ops: [] }));
-  if (!options.tty) process.stdout.on("resize", forwardResize);
+  const ownsStdout = !options.tty && !options.host;
+  if (ownsStdout) process.stdout.on("resize", forwardResize);
 
   const restore = () => bridge.engine.stop();
   process.on("exit", restore);
@@ -645,7 +686,7 @@ export function createRoot(options: RootOptions = {}): PixelRoot {
       });
       unmountDevtools();
       bridge.engine.stop();
-      if (!options.tty) process.stdout.off("resize", forwardResize);
+      if (ownsStdout) process.stdout.off("resize", forwardResize);
       process.off("exit", restore);
     },
     openDevtools() {
@@ -677,6 +718,17 @@ export function createRoot(options: RootOptions = {}): PixelRoot {
     setClipboard(text: string) {
       bridge.push(APP_VIEW, { op: "setClipboard", text });
       bridge.flush();
+    },
+    setTitle(text: string) {
+      bridge.push(APP_VIEW, { op: "setTitle", text });
+      bridge.flush();
+    },
+    retarget(target: RetargetTarget) {
+      return new Promise<void>((resolve, reject) => {
+        retargets.push({ resolve, reject });
+        bridge.push(APP_VIEW, { op: "retarget", ...target });
+        bridge.flush();
+      });
     },
   };
 }

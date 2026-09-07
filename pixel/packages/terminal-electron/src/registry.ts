@@ -15,6 +15,9 @@ export interface ViewEntry {
   externalDevtoolsAction: ((action: "close" | "dock-bottom" | "dock-right") => void) | null;
   toggleDevtools(): void;
   handleKey(event: EngineKeyEvent): boolean;
+  // Views without a PageHost (a guest app's pixels) take these directly.
+  paste?(text: string): void;
+  setActive?(focused: boolean): void;
 }
 
 export interface RegistryHooks {
@@ -61,8 +64,9 @@ export class ViewRegistry {
 
   focus(entry: ViewEntry, target: "page" | "devtools" | "popup" = "page") {
     if (this.focused !== entry) {
-      this.focused?.host?.setActive(false);
+      this.setActive(this.focused, false);
       this.focused = entry;
+      if (!entry.host) entry.setActive?.(true);
     }
     const host = entry.host;
     if (!host) return;
@@ -72,8 +76,14 @@ export class ViewRegistry {
 
   blur(entry: ViewEntry) {
     if (this.focused !== entry) return;
-    entry.host?.setActive(false);
+    this.setActive(entry, false);
     this.focused = null;
+  }
+
+  private setActive(entry: ViewEntry | null, active: boolean) {
+    if (!entry) return;
+    if (entry.host) entry.host.setActive(active);
+    else entry.setActive?.(active);
   }
 
   quit(entry: ViewEntry | null) {
@@ -137,7 +147,10 @@ export class ViewRegistry {
 
   handlePaste(text: string) {
     const host = this.focused?.host;
-    if (!host) return;
+    if (!host) {
+      this.focused?.paste?.(text);
+      return;
+    }
     if (host.popup) host.popup.input.paste(text);
     else if (host.devtoolsFocused && host.devtools) host.devtools.input.paste(text);
     else host.paste(text);
@@ -152,7 +165,7 @@ export class ViewRegistry {
   }
 
   handleTerminalFocus(focused: boolean) {
-    this.focused?.host?.setActive(focused);
+    this.setActive(this.focused, focused);
   }
 
   private clipboardKeys(

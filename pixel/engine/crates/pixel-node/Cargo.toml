@@ -12,7 +12,7 @@ pixel-core = { workspace = true }
 napi = { version = "2", default-features = false, features = ["napi8"] }
 napi-derive = "2"
 serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", features = ["raw_value"] }
+serde_json = { workspace = true, features = ["raw_value"] }
 pulldown-cmark = { version = "0.13", default-features = false }
 tree-sitter = "0.26.10"
 tree-sitter-highlight = "0.26.10"
@@ -28,9 +28,9 @@ lz4_flex = { version = "0.11", default-features = false, features = ["std", "saf
 mp4 = "0.14.0"
 png = "0.18.1"
 tiny-skia.workspace = true
+rustix = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-rustix = { workspace = true }
 libc = { workspace = true }
 
 [build-dependencies]

@@ -34,7 +34,8 @@ use crate::scroll::profiles::Smooth;
 use crate::style::Color;
 use crate::surfaces::Rect;
 use crate::terminal::{
-    Event, KeyEvent, Mods, Mouse, MouseButton, MouseKind, Terminal, TerminalColors,
+    Event, Handoff, KeyEvent, Mods, Mouse, MouseButton, MouseKind, Retarget, Terminal,
+    TerminalColors,
 };
 use crate::text_input::InputReply;
 use crate::throttle::CpuThrottle;
@@ -66,8 +67,19 @@ pub struct EngineConfig {
     pub cell_metrics_font: usize,
     pub watch_resize: bool,
     pub tty: Option<String>,
+    pub host: Option<HostConfig>,
     pub wrapper: Wrapper,
     pub session_env: crate::terminal::SessionEnv,
+}
+
+#[derive(Debug, Clone)]
+pub struct HostConfig {
+    pub socket: String,
+    pub pane: String,
+    pub name: String,
+    // Set when the host is not terminal-electron and frames should be drawn
+    // straight into this terminal as virtual placements.
+    pub tty: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -96,6 +108,11 @@ impl ChangeSource {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum EngineEvent {
+    HostClosed,
+    Handoff {
+        tty: Option<String>,
+        socket: Option<String>,
+    },
     Click {
         view: usize,
         node: NodeId,
@@ -262,6 +279,7 @@ pub enum DragPhase {
 
 pub struct Engine {
     pub term: Terminal,
+    session_env: crate::terminal::SessionEnv,
     pub comp: Compositor,
     pub fonts: Vec<fontdue::Font>,
     cell_metrics_font: usize,
@@ -336,9 +354,15 @@ const RELAYED_RESIZE_POLL: Duration = Duration::from_millis(500);
 impl Engine {
     pub fn new(config: EngineConfig) -> io::Result<Self> {
         assert!(!config.fonts.is_empty());
-        let mut term = match &config.tty {
-            Some(path) => Terminal::open(path, config.wrapper, config.session_env.clone())?,
-            None => Terminal::new(config.wrapper, config.session_env.clone())?,
+        let mut term = match (&config.host, &config.tty) {
+            (Some(host), _) => match &host.tty {
+                Some(tty) => Terminal::join_embedded(&host.socket, &host.pane, &host.name, tty)?,
+                None => Terminal::join_host(&host.socket, &host.pane, &host.name)?,
+            },
+            (None, Some(path)) => {
+                Terminal::open(path, config.wrapper, config.session_env.clone())?
+            }
+            (None, None) => Terminal::new(config.wrapper, config.session_env.clone())?,
         };
         if config.watch_resize {
             term.watch_resize()?;
@@ -348,7 +372,13 @@ impl Engine {
         let cell = term.cell_size()?.unwrap_or((16, 32));
         let window = window_from(&ws, cell);
         let base_px = px_for_cell_height(&config.fonts[config.cell_metrics_font], cell.1 as f32);
-        let native = NativeScroll::spawn(term.waker().ok());
+        // Under a terminal-electron owner the owner pairs trackpad deltas and
+        // forwards them; a foreign host only sends wheel ticks, so pair them here.
+        let native = if term.is_hosted() && !term.is_embedded() {
+            None
+        } else {
+            NativeScroll::spawn(term.waker().ok())
+        };
         let use_native = native.is_some();
         let pixel_mouse = term.reports_pixel_mouse();
         logging::info(
@@ -369,6 +399,7 @@ impl Engine {
         );
         let mut engine = Self {
             term,
+            session_env: config.session_env,
             comp: Compositor::new(window),
             fonts: config.fonts,
             cell_metrics_font: config.cell_metrics_font,
@@ -835,8 +866,47 @@ impl Engine {
         Ok(())
     }
 
+    // Moves the whole engine onto another terminal or owner: everything laid out
+    // stays, only where pixels go and events come from changes.
+    pub fn retarget(&mut self, target: Retarget) -> io::Result<()> {
+        self.term.retarget(target, self.session_env.clone())?;
+        self.native = if self.term.is_hosted() && !self.term.is_embedded() {
+            None
+        } else {
+            NativeScroll::spawn(self.term.waker().ok())
+        };
+        self.use_native = self.native.is_some();
+        self.pixel_mouse = self.term.reports_pixel_mouse();
+        let colors = self.term.query_colors()?;
+        let mut out = Vec::new();
+        self.apply_colors(colors, &mut out);
+        self.cell_estimate = None;
+        self.term.forget_cell_size();
+        let ws = self.term.size()?;
+        self.apply_window(&ws)?;
+        self.comp.dirty = true;
+        self.pending.append(&mut out);
+        Ok(())
+    }
+
     fn handle_event(&mut self, event: Event, out: &mut Vec<EngineEvent>) -> io::Result<()> {
         match event {
+            Event::HostClosed => out.push(EngineEvent::HostClosed),
+            Event::Wheel {
+                x,
+                y,
+                delta_x,
+                delta_y,
+                mods,
+            } => self.forwarded_wheel((x as f32, y as f32), (delta_x, delta_y), mods, out),
+            Event::Handoff(Handoff::Adopt { tty }) => out.push(EngineEvent::Handoff {
+                tty: Some(tty),
+                socket: None,
+            }),
+            Event::Handoff(Handoff::Rejoin { socket }) => out.push(EngineEvent::Handoff {
+                tty: None,
+                socket: Some(socket),
+            }),
             Event::Key(key) => self.handle_key(key, out)?,
             Event::Paste(text) => {
                 if crate::profiler::is_recording() {
@@ -920,6 +990,12 @@ impl Engine {
     pub fn set_clipboard(&mut self, text: &str) {
         if let Err(error) = self.term.set_clipboard(text) {
             logging::warn("engine", format!("clipboard write failed: {error}"));
+        }
+    }
+
+    pub fn set_title(&mut self, text: &str) {
+        if let Err(error) = self.term.set_title(text) {
+            logging::warn("engine", format!("title write failed: {error}"));
         }
     }
 

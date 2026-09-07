@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import path from "node:path";
 import { useRef, useState } from "react";
 
@@ -23,6 +24,23 @@ const root = createRoot({
 });
 
 const PAGE_URL = `file://${path.join(__dirname, "..", "page.html")}`;
+
+// Launches the hello example the way any terminal-electron app would be
+// launched from a shell in this pane; the library makes it a guest tab.
+function openExample(name: string) {
+  const bin = path.join(path.dirname(require.resolve("terminal-electron/package.json")), "dist", "bin.js");
+  const child = spawn(process.execPath, [bin, path.join(__dirname, "..", "..", name)], {
+    stdio: "inherit",
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+  });
+  child.on("error", () => {});
+}
+
+// The installed browser cli sees that this pane is owned and joins it as a tab.
+function openBrowser() {
+  const child = spawn("terminal-browser", ["open", "https://terminal-browser.com"], { stdio: "inherit" });
+  child.on("error", () => {});
+}
 
 function Button({
   label,
@@ -109,6 +127,9 @@ function App() {
           theme={theme}
           onClick={() => setShowDevtools((shown) => !shown)}
         />
+        <Button label="open hello" rem={rem} theme={theme} onClick={() => openExample("hello")} />
+        <Button label="open composed" rem={rem} theme={theme} onClick={() => openExample("composed")} />
+        <Button label="open browser" rem={rem} theme={theme} onClick={openBrowser} />
         <Button label="quit" rem={rem} theme={theme} onClick={() => root.stop()} />
       </Box>
       <Box style={{ flexGrow: 1, flexBasis: 0, gap: 2 }}>

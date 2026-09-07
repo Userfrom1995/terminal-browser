@@ -1,11 +1,14 @@
 export { createRoot } from "./root";
 export type { Root, RootOptions } from "./root";
+export type { Instance } from "./instances";
+export { findOwner, listInstances } from "./instances";
 export { WebView } from "./webview";
 export type {
   DownloadProgress,
   OpenWindowDecision,
   WebViewHandle,
   WebViewProps,
+  WebViewRecording,
   WebViewState,
 } from "./webview";
 export { DevTools } from "./devtools";

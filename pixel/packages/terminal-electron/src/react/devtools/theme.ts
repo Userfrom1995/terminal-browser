@@ -85,5 +85,5 @@ export function refreshTheme(colors: TerminalColors): void {
   theme = build(colors);
 }
 
-export const MONO = 1;
+export const MONO = 0;
 export const UI = 0;

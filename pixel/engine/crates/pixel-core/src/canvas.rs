@@ -672,11 +672,20 @@ impl Canvas {
         if x2 <= x1 || y2 <= y1 || color[3] == 0 {
             return;
         }
+        // blend_pixel expects a premultiplied source like the pixmaps it usually blends;
+        // a style colour is straight rgba
+        let alpha = u32::from(color[3]);
+        let premultiplied = [
+            ((u32::from(color[0]) * alpha + 127) / 255) as u8,
+            ((u32::from(color[1]) * alpha + 127) / 255) as u8,
+            ((u32::from(color[2]) * alpha + 127) / 255) as u8,
+            color[3],
+        ];
         for row in y1..y2 {
             let start = ((row * self.width + x1) * 4) as usize;
             let len = ((x2 - x1) * 4) as usize;
             for px in self.pixels[start..start + len].chunks_exact_mut(4) {
-                blend_pixel(px, &color, color[3]);
+                blend_pixel(px, &premultiplied, color[3]);
             }
         }
     }
@@ -1222,6 +1231,19 @@ mod tests {
             "downscale must keep the gradient, got {:?}",
             [down.pixels[0], down.pixels[4], down.pixels[8]]
         );
+    }
+
+    #[test]
+    fn blend_fill_treats_style_colours_as_straight_alpha() {
+        let mut canvas = Canvas::new(2, 1);
+        canvas.fill([0, 0, 0, 255]);
+        canvas.blend_fill(0.0, 0.0, 2.0, 1.0, [0, 0, 255, 128]);
+        let px = &canvas.pixels[0..4];
+        assert!(
+            px[2] >= 127 && px[2] <= 129,
+            "half alpha blue over black should be half blue, got {px:?}"
+        );
+        assert_eq!(px[0], 0);
     }
 
     #[test]
