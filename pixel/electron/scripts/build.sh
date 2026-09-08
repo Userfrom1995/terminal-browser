@@ -66,6 +66,10 @@ gclient sync -f --with_branch_heads --with_tags --no-history -j8 \
 
 if [ "$HOST" = linux-x64 ] && [ "${SKIP_BUILD_DEPS:-0}" != "1" ]; then
   echo "== install chromium build deps =="
+  # the runner image has shipped with a truncated package index before, which
+  # makes every apt query fail; fetching the indexes fresh is the cure
+  sudo rm -rf /var/lib/apt/lists/* /var/cache/apt/*.bin
+  sudo apt-get update || true
   sudo "$WORK/electron/src/build/install-build-deps.sh" --no-prompt
 fi
 if ! command -v zip >/dev/null; then

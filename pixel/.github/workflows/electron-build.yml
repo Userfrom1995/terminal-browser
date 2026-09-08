@@ -7,6 +7,10 @@ on:
       version:
         description: "Electron version to build (e.g. 43.3.0)"
         required: true
+      platforms:
+        description: "Comma separated platforms to build; the others keep their published assets"
+        required: false
+        default: "darwin-arm64,darwin-x64,linux-x64,linux-arm64"
 
 permissions:
   contents: write
@@ -34,6 +38,7 @@ jobs:
             runner: ${{ vars.LINUX_BUILD_RUNNER || 'depot-ubuntu-24.04-16' }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 600
+    if: contains(format(',{0},', inputs.platforms || 'darwin-arm64,darwin-x64,linux-x64,linux-arm64'), format(',{0},', matrix.platform))
     steps:
       - uses: actions/checkout@v4
 
