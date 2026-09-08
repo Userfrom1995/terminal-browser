@@ -2,6 +2,8 @@ import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
+import { createRef } from "react";
 import type { ReactNode } from "react";
 
 import { app } from "electron";
@@ -24,7 +26,8 @@ import { createRoot as createEngineRoot } from "./react";
 import type { EngineKeyEvent, PixelRoot, RootOptions as EngineRootOptions } from "./react";
 import { RootContext, ViewRegistry } from "./registry";
 import type { ViewEntry } from "./registry";
-import type { WebViewHandle } from "./webview";
+import { WebView } from "./webview";
+import type { WebViewHandle, WebViewProps } from "./webview";
 import { CellZoomFollower, hostDisplayScale } from "./scale";
 import { detect } from "./terminal";
 import { initOffscreenMode } from "./web/offscreen";
@@ -58,12 +61,19 @@ export interface RootOptions
   onExit?: (code: number) => void;
 }
 
-export interface Root extends Omit<PixelRoot, "render" | "stop" | "retarget"> {
+/** [placeholder copy: WebView props other than what a page filling the pane decides for itself.] */
+export type LoadOptions = Omit<WebViewProps, "src" | "style" | "hidden" | "autoFocus">;
+
+export interface Root extends Omit<PixelRoot, "render" | "flushSync" | "stop" | "retarget"> {
   /** [placeholder copy: Device pixels per css pixel that WebViews render at, from the terminal or the display.] */
   readonly displayScale: number;
   /** [placeholder copy: True while this app is drawn inside another terminal-electron app's pane.] */
   readonly hosted: boolean;
   render(element: ReactNode): void;
+  /** [placeholder copy: Shows one page filling the pane, like BrowserWindow.loadURL. The first call creates the page with the options given; later calls navigate it. Returns the page's handle. For anything beside the page, use render.] */
+  loadURL(url: string, options?: LoadOptions): WebViewHandle;
+  /** [placeholder copy: loadURL for a local file.] */
+  loadFile(file: string, options?: LoadOptions): WebViewHandle;
   /** [placeholder copy: Closes every WebView, restores the terminal and calls onExit.] */
   stop(code?: number): void;
 }
@@ -116,8 +126,7 @@ export function createRoot(options: RootOptions = {}): Root {
   // Read from the session's environment, not the process's: a daemon serving
   // several panes gets these per session from whoever asked for it.
   const tty = options.tty ?? env.TERMINAL_ELECTRON_TTY ?? ownTty();
-  // A program that is not terminal-electron hosting us: it owns the screen and
-  // we draw into it as an image it places.
+
   const embed = env.TERMINAL_ELECTRON_EMBED ?? null;
   let owner: Instance | null = tty && !embed ? findOwner(tty) : null;
   const name = options.name ?? app.getName();
@@ -145,6 +154,7 @@ export function createRoot(options: RootOptions = {}): Root {
     }
     flushSessions();
     try {
+      // wait whats going on here 
       engineRoot.setPointerShape("text");
     } catch {}
     // The tty is released here; only then may guests learn the owner is gone.
@@ -352,6 +362,19 @@ export function createRoot(options: RootOptions = {}): Root {
   }
   installSignals();
 
+  const pageRef = createRef<WebViewHandle>();
+  const loadURL = (url: string, options: LoadOptions = {}): WebViewHandle => {
+    if (pageRef.current) {
+      pageRef.current.loadURL(url);
+      return pageRef.current;
+    }
+    engineRoot.flushSync(() => {
+      root.render(<WebView ref={pageRef} src={url} style={{ width: "100%", height: "100%" }} {...options} />);
+    });
+    if (!pageRef.current) throw new Error("[placeholder copy: the page did not mount]");
+    return pageRef.current;
+  };
+
   const root: Root = {
     ...engineRoot,
     displayScale: views.displayScale,
@@ -369,6 +392,8 @@ export function createRoot(options: RootOptions = {}): Root {
         </RootContext.Provider>,
       );
     },
+    loadURL,
+    loadFile: (file, options) => loadURL(pathToFileURL(path.resolve(file)).href, options),
     setTitle(text: string) {
       currentTitle = text || null;
       engineRoot.setTitle(text);

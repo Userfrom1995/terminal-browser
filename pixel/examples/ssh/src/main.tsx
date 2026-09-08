@@ -25,7 +25,7 @@ root.render(
       proxy={proxy}
       partition={partition}
       style={{ flexGrow: 1 }}
-      onState={(state) => root.setTitle(state.title || state.url)}
+      onChange={(state) => root.setTitle(state.title || state.url)}
     />
   </Box>,
 );

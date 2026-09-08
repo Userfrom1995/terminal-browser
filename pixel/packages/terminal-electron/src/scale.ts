@@ -10,8 +10,6 @@ export function hostDisplayScale(terminal: Terminal | null, env: NodeJS.ProcessE
   return screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).scaleFactor;
 }
 
-// When the terminal's font size changes, its cell height changes but the pane
-// pixel size does not. The ratio tells web content to zoom to match.
 export class CellZoomFollower {
   private last: { height: number; basePx: number } | null = null;
 

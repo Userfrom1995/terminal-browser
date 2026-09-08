@@ -59,6 +59,43 @@ terminal-electron dist/main.js -- --verbose https://example.com
         ]}
       />
 
+      <H2 id="shipping">Shipping your app</H2>
+      <P>
+        An installed copy of your app needs three things next to your own code: the library, the patched Electron and
+        the native engine. Where the library looks for the last two is a fixed layout, so a build script can rely on
+        it. Nothing else about the package&apos;s insides is a contract.
+      </P>
+      <Rows
+        rows={[
+          ["<terminal-electron>/electron/dist/", <>The patched Electron build, resolved relative to the library&apos;s own files. On macOS this holds <InlineCode>Electron.app</InlineCode>, on Linux an <InlineCode>electron</InlineCode> binary. The launcher refuses to start unless the checksum file <InlineCode>.zenbu-electron-sha256</InlineCode> is present next to it, which is how it tells a complete install from a half-finished download.</>],
+          ["terminal-electron-native-<platform>-<arch>/pixel.node", <>The rendering engine. The library loads it with a plain <InlineCode>require</InlineCode> of the package by name, so it has to sit in a <InlineCode>node_modules</InlineCode> directory that Node&apos;s resolution reaches from wherever the library&apos;s code ends up running.</>],
+          ["terminal-electron-native-<platform>-<arch>/native-scroll-helper", <>macOS only. Resolved the same way, unless <InlineCode>NATIVE_SCROLL_HELPER</InlineCode> already points at a copy.</>],
+        ]}
+      />
+      <P>Two ways to build an install that satisfies this:</P>
+      <List
+        items={[
+          <>
+            <strong>Keep node_modules.</strong> Run a production install of your package.json into the staging
+            directory, then copy <InlineCode>electron/dist</InlineCode> from a checkout that has already run the install
+            step into the staged package. Everything resolves as it does in development, and your launcher runs
+            Electron from <InlineCode>node_modules/terminal-electron/electron/dist</InlineCode>.
+          </>,
+          <>
+            <strong>Bundle the JavaScript.</strong> If you bundle your app with the library inlined, keep{" "}
+            <InlineCode>electron</InlineCode> and <InlineCode>*.node</InlineCode> external, copy the native package to
+            a <InlineCode>node_modules</InlineCode> directory above your bundle under its original name, and copy{" "}
+            <InlineCode>electron/dist</InlineCode> wherever you like, since your own launcher now decides where
+            Electron is. The <InlineCode>Electron.app</InlineCode> bundle can be renamed and its Info.plist edited to
+            carry your app&apos;s name and identifier.
+          </>,
+        ]}
+      />
+      <Note>
+        Find the package with <InlineCode>require.resolve(&quot;terminal-electron/package.json&quot;)</InlineCode>{" "}
+        from your app&apos;s directory rather than assuming a path. Package managers place and link it differently.
+      </Note>
+
       <H2 id="terminals">Terminals</H2>
       <P>
         Ghostty, kitty and WezTerm display images and report mouse positions in pixels, which is what makes clicking
@@ -67,8 +104,9 @@ terminal-electron dist/main.js -- --verbose https://example.com
         image support is refused at launch with a message pointing at one that has it.
       </P>
       <Note>
-        On macOS the install ad-hoc signs the Electron binary and marks it as a background app, so no Dock icon appears
-        when your app runs.
+        The Electron build is marked as a background app, so no Dock icon appears when your app runs, and on macOS it is
+        signed and notarized. Cookies that pages store are encrypted with a key in the OS keychain, as in Chrome; the key is
+        named after your app, so renaming an app orphans its cookies.
       </Note>
     </>
   );

@@ -67,7 +67,8 @@ export interface WebViewProps {
   hidden?: boolean;
   /** [placeholder copy: Keep showing the last frame, stretched, while the view changes size instead of clearing to the background until the page repaints. Defaults to true.] */
   keepFrame?: boolean;
-  onState?(state: WebViewState): void;
+  /** [placeholder copy: The page's url, title, loading, history, find matches, zoom and favicon, whenever any of them change.] */
+  onChange?(state: WebViewState): void;
   /** [placeholder copy: Observes pointer events on the page after they are delivered to it.] */
   onPointer?(event: PointerEvent): void;
   /** [placeholder copy: Replaces the default right click menu.] */
@@ -79,6 +80,10 @@ export interface WebViewProps {
 
 export interface WebViewHandle {
   readonly webContents: Electron.WebContents;
+  /** [placeholder copy: The latest state the page reported.] */
+  readonly state: WebViewState;
+  /** [placeholder copy: Called with the new state whenever it changes. Returns an unsubscribe function.] */
+  onChange(listener: (state: WebViewState) => void): () => void;
   loadURL(url: string): void;
   focus(): void;
   blur(): void;
@@ -146,6 +151,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
   const lastDragResize = useRef(0);
   const pendingInspect = useRef<{ x: number; y: number } | null>(null);
   const frameListeners = useRef(new Set<() => void>());
+  const changeListeners = useRef(new Set<(state: WebViewState) => void>());
 
   const [popup, setPopup] = useState<PopupView | null>(null);
   const [devtoolsOpen, setDevtoolsOpen] = useState(false);
@@ -267,7 +273,8 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
       (state) => {
         debug("state", state);
         stateRef.current = state;
-        propsRef.current.onState?.(state);
+        propsRef.current.onChange?.(state);
+        for (const listener of changeListeners.current) listener(state);
       },
     );
     hostRef.current = host;
@@ -476,6 +483,15 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
       const handle: WebViewHandle = {
         get webContents() {
           return host().webContents;
+        },
+        get state() {
+          return stateRef.current;
+        },
+        onChange: (listener) => {
+          changeListeners.current.add(listener);
+          return () => {
+            changeListeners.current.delete(listener);
+          };
         },
         loadURL: (url) => host().navigate(url),
         focus: () => registry.focus(entry),

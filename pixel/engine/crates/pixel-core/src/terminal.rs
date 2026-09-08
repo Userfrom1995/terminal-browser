@@ -448,11 +448,6 @@ impl Terminal {
         terminal.pending = pending;
         terminal.kitty_keyboard = true;
         terminal.mouse_pixels = true;
-        // The host relays what the terminal answers, so it can be asked directly.
-        terminal.color_scheme_updates = true;
-        terminal.io.out().write_all(b"\x1b[?2031h")?;
-        terminal.io.out().flush()?;
-        terminal.request_colors()?;
         Ok(terminal)
     }
 
@@ -824,8 +819,6 @@ impl Terminal {
         Ok(frame.len())
     }
 
-    // The host owns the screen, so only the image itself is sent: a virtual
-    // placement the host shows by printing placeholder cells wherever it likes.
     fn draw_embedded(&mut self, canvas: &Canvas) -> io::Result<usize> {
         let shrank = self
             .last_frame_size
@@ -982,9 +975,6 @@ impl Terminal {
             return Ok(None);
         }
         loop {
-            if let Some(event) = self.relayed_event() {
-                return Ok(Some(event));
-            }
             while let Some(end) = self.pending.iter().position(|&b| b == b'\n') {
                 let line: Vec<u8> = self.pending.drain(..=end).collect();
                 let Some(state) = self.hosted.as_mut() else {
@@ -1005,21 +995,9 @@ impl Terminal {
                     }
                     return Ok(Some(event));
                 }
-                if let Some(event) = self.relayed_event() {
-                    return Ok(Some(event));
-                }
             }
-            let color_deadline = self.color_query.as_ref().map(ColorQuery::deadline);
-            let until = [deadline, color_deadline].into_iter().flatten().min();
-            let wait = until.map(|d| d.saturating_duration_since(Instant::now()));
-            // A wake or a timeout both hand control back to the engine; only a
-            // colour query that ran out of replies has something to say first.
+            let wait = deadline.map(|d| d.saturating_duration_since(Instant::now()));
             if !self.wait_for_input(wait)? {
-                if color_deadline.is_some_and(|d| Instant::now() >= d)
-                    && let Some(colors) = self.take_settled_colors()
-                {
-                    return Ok(Some(Event::Colors(colors)));
-                }
                 return Ok(None);
             }
             let mut chunk = [0u8; 4096];
@@ -1037,28 +1015,6 @@ impl Terminal {
             }
             self.pending.extend_from_slice(&chunk[..n]);
         }
-    }
-
-    // Replies the host relayed go through the same parser tty input does, but
-    // only what a query could have asked for is acted on.
-    fn relayed_event(&mut self) -> Option<Event> {
-        let mut buf = std::mem::take(&mut self.hosted.as_mut()?.relayed);
-        let mut found = None;
-        while found.is_none() {
-            let Some((raw, used)) = parse_event_kitty(&buf, true) else {
-                break;
-            };
-            buf.drain(..used);
-            found = match raw {
-                RawEvent::Color(slot, rgba) => self.collect_color(slot, rgba).map(Event::Colors),
-                RawEvent::ColorSchemeChanged => Some(Event::ColorSchemeChanged),
-                _ => None,
-            };
-        }
-        if let Some(state) = self.hosted.as_mut() {
-            state.relayed = buf;
-        }
-        found
     }
 
     fn wait_for_wake(&self, wait: Option<Duration>) -> io::Result<()> {
@@ -1305,7 +1261,7 @@ impl Terminal {
     }
 
     pub fn request_colors(&mut self) -> io::Result<()> {
-        if self.hosted.is_some() && !self.is_embedded() {
+        if self.hosted.is_some() {
             return Ok(());
         }
         let query = Self::color_queries();

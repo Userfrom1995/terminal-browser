@@ -9,6 +9,9 @@
 #   ELECTRON_BUILD_DIR  work dir for depot_tools + checkout (default ~/.terminal-electron-build)
 #   GN_BUILD_TYPE       release (default) or testing
 #   SKIP_BUILD_DEPS     1 to skip chromium's install-build-deps.sh on linux
+#   ELECTRON_UNSIGNED   1 to sign macOS builds ad-hoc instead of with the Developer ID
+#                       (otherwise the MACOS_SIGN_* and APPLE_API_* variables of
+#                       scripts/macos-sign.sh are required)
 set -euo pipefail
 
 VERSION="${1:?usage: build.sh <electron version> <output dir> [platform]}"
@@ -64,6 +67,9 @@ gclient sync -f --with_branch_heads --with_tags --no-history -j8 \
 if [ "$HOST" = linux-x64 ] && [ "${SKIP_BUILD_DEPS:-0}" != "1" ]; then
   echo "== install chromium build deps =="
   sudo "$WORK/electron/src/build/install-build-deps.sh" --no-prompt
+fi
+if ! command -v zip >/dev/null; then
+  sudo apt-get install -y zip
 fi
 
 if [ "$PLATFORM" = linux-arm64 ]; then
@@ -124,8 +130,37 @@ case "$GOT" in
     ;;
 esac
 
+echo "== finish the app =="
+# The zip electron produced is reopened to bake in what every install needs,
+# so no install step has to edit the binary and break its signature afterwards.
+STAGE="$WORK/stage-$PLATFORM"
+TOOLS="$WORK/tools"
+rm -rf "$STAGE"
+mkdir -p "$STAGE" "$TOOLS"
+(cd "$STAGE" && unzip -q "$BUILD/dist.zip")
+(cd "$TOOLS" && npm install --no-save --no-audit --no-fund --silent @electron/fuses@2.1.3 @electron/osx-sign@1.3.3)
+FUSES="$TOOLS/node_modules/.bin/electron-fuses"
+if [ "$GN_SUBDIR" = mac ]; then
+  APP="$STAGE/Electron.app"
+  # a background app: no Dock icon while a terminal pane is drawing
+  /usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" "$APP/Contents/Info.plist"
+  FUSE_TARGET="$APP"
+else
+  FUSE_TARGET="$STAGE/electron"
+fi
+# cookies on disk are encrypted with an OS keychain key, as chrome does;
+# RunAsNode stays on because launchers run this electron as node for their clis
+"$FUSES" write --app "$FUSE_TARGET" EnableCookieEncryption=on
+"$FUSES" read --app "$FUSE_TARGET" | tee "$WORK/fuses.txt"
+grep -q "EnableCookieEncryption is Enabled" "$WORK/fuses.txt"
+grep -q "RunAsNode is Enabled" "$WORK/fuses.txt"
+if [ "$GN_SUBDIR" = mac ]; then
+  bash "$REPO_DIR/scripts/macos-sign.sh" "$APP" "$TOOLS"
+fi
+
 ASSET="electron-v$VERSION-$PLATFORM.zip"
-cp "$BUILD/dist.zip" "$OUT_DIR/$ASSET"
+rm -f "$OUT_DIR/$ASSET"
+(cd "$STAGE" && zip -q -r -y -X "$OUT_DIR/$ASSET" .)
 cd "$OUT_DIR"
 if command -v sha256sum >/dev/null; then
   sha256sum "$ASSET" electron.d.ts | awk '{print $1 " *" $2}' > SHASUMS256.txt

@@ -46,7 +46,7 @@ function openPage(request: Extract<Request, { cmd: "open" }>, onClosed: (code: n
     <WebView
       src={request.url}
       style={{ width: "100%", height: "100%" }}
-      onState={(state) => root.setTitle(state.title || state.url)}
+      onChange={(state) => root.setTitle(state.title || state.url)}
     />,
   );
   return root;

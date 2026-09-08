@@ -45,27 +45,6 @@ function sha256(bytes) {
   return crypto.createHash("sha256").update(bytes).digest("hex");
 }
 
-function markMenuBarOnly(appDir) {
-  const plist = path.join(appDir, "Contents", "Info.plist");
-  try {
-    execFileSync("/usr/libexec/PlistBuddy", ["-c", "Add :LSUIElement bool true", plist], {
-      stdio: "ignore",
-    });
-  } catch {
-    try {
-      execFileSync("/usr/libexec/PlistBuddy", ["-c", "Set :LSUIElement true", plist], {
-        stdio: "ignore",
-      });
-    } catch {}
-  }
-  // editing Info.plist invalidates the signature, and arm64 refuses to run unsigned code
-  try {
-    execFileSync("codesign", ["--force", "--deep", "--sign", "-", appDir], { stdio: "ignore" });
-  } catch (error) {
-    process.stderr.write(`terminal-electron: could not re-sign ${appDir}: ${error.message}\n`);
-  }
-}
-
 function readMarker(file) {
   try {
     return fs.readFileSync(file, "utf8").trim();
@@ -152,7 +131,6 @@ try {
   if (stamped !== version) {
     throw new Error(`fetched electron stamps itself ${stamped}, expected ${version}`);
   }
-  if (process.platform === "darwin") markMenuBarOnly(path.join(unpacked, "Electron.app"));
   fs.rmSync(dest, { recursive: true, force: true });
   fs.renameSync(unpacked, dest);
   fs.writeFileSync(marker, expected);

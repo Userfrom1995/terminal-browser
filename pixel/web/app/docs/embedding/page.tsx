@@ -16,10 +16,11 @@ export default function Embedding() {
         the input you decide to send it.
       </P>
       <P>
-        Your program does not need to understand pixels, images or any of the app&apos;s output. It needs to do three
-        things: pass the app the keys and mouse events meant for it, print one specific string of characters where the
-        app should appear, and hand back the terminal&apos;s answers to a few questions the app asks. Everything
-        travels over a local socket as lines of JSON. A complete host in Python is about 300 lines:{" "}
+        [placeholder copy: Your program does not need to understand pixels, images or any of the app&apos;s output.
+        It needs to do two things: pass the app the keys and mouse events meant for it, and print one specific string
+        of characters where the app should appear. The app never reads your terminal and never asks it anything, so
+        your program stays the only reader of its own input. Everything travels over a local socket as lines of JSON.
+        A complete host in Python is about 300 lines:]{" "}
         <a href={`${GITHUB}/tree/main/examples/tui-host`} className="text-text underline" target="_blank" rel="noreferrer">
           examples/tui-host/host.py
         </a>
@@ -71,7 +72,7 @@ host → app    {"type":"hello","cols":91,"rows":30,"width":910,"height":750,
           ["cell", "The size of one character cell in pixels. Ask the terminal with the escape sequence CSI 16 t, or divide the window's pixel size by its cell counts."],
           ["imageId", "The id the app should use for its image. Any number your program does not already use for images."],
           ["transport", "How the app should send image data to the terminal: \"inline\" (always works, slower), \"file\" or \"shm\" (faster; Ghostty and kitty support file). The app cannot find this out itself because only your program can read the terminal's replies."],
-          ["colors", "Optional: the terminal's colours as [r, g, b, a] for foreground, background and a 16 entry palette. Usually you skip this and relay replies instead; see below."],
+          ["colors", "[placeholder copy: Optional: the terminal's colours as [r, g, b, a] for foreground, background and a 16 entry palette, so the app can match your theme. Leave it out and the app uses its defaults. See below for how to find them.]"],
         ]}
       />
 
@@ -85,7 +86,7 @@ host → app    {"type":"hello","cols":91,"rows":30,"width":910,"height":750,
 {"type":"mouse","kind":"scrolldown","button":"none","mods":{...},"x":412,"y":88}
 {"type":"wheel","x":412,"y":88,"deltaX":0,"deltaY":-36.5,"mods":{...}}
 {"type":"focus","focused":true}
-{"type":"terminal","data":"\\u001b]11;rgb:1e1e/1e1e/2e2e\\u001b\\\\"}
+{"type":"colors","colors":{"foreground":[220,220,220,255],"background":[30,30,46,255]}}
 `}</Code>
       <Rows
         rows={[
@@ -93,7 +94,7 @@ host → app    {"type":"hello","cols":91,"rows":30,"width":910,"height":750,
           ["key", "key is the character for printable keys, otherwise a name: enter, backspace, tab, escape, delete, up, down, left, right, home, end, pageup, pagedown, insert, f1 to f12. kind is press, repeat or release."],
           ["mouse", "kind is down, up, move, or one of scrollup, scrolldown, scrollleft, scrollright for wheel ticks. x and y are pixels measured from the top left of the region."],
           ["wheel", "Smooth scrolling deltas in pixels, if your program has them. A program that only gets wheel ticks from the terminal never sends this."],
-          ["terminal", "Bytes the terminal sent that are answers to questions rather than user input. Explained below."],
+          ["colors", "[placeholder copy: Optional. Send when your terminal's theme changes, with the same shape as colors in hello.]"],
         ]}
       />
 
@@ -134,16 +135,14 @@ write("\\x1b[39m")
         before printing, so the cells always match the image the app most recently drew.
       </P>
 
-      <H2 id="replies">Relaying the terminal&apos;s answers</H2>
+      <H2 id="colors">Colours</H2>
       <P>
-        Programs ask a terminal questions by writing escape sequences to it, and the terminal answers by writing bytes
-        back on the same input stream your keystrokes arrive on. The app writes such questions to the terminal
-        directly, for example to learn its colours, but only your program can read the answers, because only one
-        program can read the terminal&apos;s input. So when you read something that is an answer rather than a
-        keystroke, forward it unchanged in a <InlineCode>terminal</InlineCode> message. Answers are easy to
-        recognise: they start with ESC ] (an OSC response) or ESC [ ? and end in n (a mode report). The app parses them
-        with the same code it uses when it has a terminal to itself, and its colours follow your terminal&apos;s theme,
-        including live changes.
+        [placeholder copy: The app cannot ask your terminal for its colours, because only one program can read the
+        terminal&apos;s input and that program is yours. If you want the app to match your theme, ask the terminal
+        yourself once at startup: write OSC 10 ; ? and OSC 11 ; ? and read back the two rgb: replies, then put them in
+        the <InlineCode>colors</InlineCode> field of <InlineCode>hello</InlineCode>. Send a{" "}
+        <InlineCode>colors</InlineCode> message later if the theme changes. Most terminal UI libraries expose these
+        already. If you skip it, the app uses its default colours.]
       </P>
 
       <H2 id="mouse">Mouse precision</H2>

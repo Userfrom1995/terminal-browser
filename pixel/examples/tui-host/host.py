@@ -8,13 +8,16 @@ program listens on. Over that socket, newline-delimited JSON:
   app -> host   {"type":"join","pane":..,"name":..,"pid":..}
   host -> app   {"type":"hello","cols":..,"rows":..,"width":..,"height":..,
                  "cell":[w,h],"imageId":..,"transport":"inline"|"file"|"shm",
-                 "focused":true}
-  host -> app   size, key, mouse, paste, focus  (what a tty would have carried)
+                 "focused":true,"colors":{..}}        colors is optional
+  host -> app   size, key, mouse, paste, focus, colors  (what a tty would have carried)
   app -> host   {"type":"placed","imageId":..,"cols":..,"rows":..}
                 title, pointer, clipboard
 
 The app draws itself straight into the terminal as a kitty virtual placement;
-this program decides where it shows by printing placeholder cells there.]
+this program decides where it shows by printing placeholder cells there. The
+app never reads the terminal and never asks it anything, so this program is
+the only reader of its own input and only ever sees its own keys, mouse
+reports and replies.]
 """
 import fcntl
 import json
@@ -113,6 +116,23 @@ def query_cell_size(fd):
     return 10, 20, False
 
 
+def query_colors(fd):
+    """Asks the terminal for its foreground and background (OSC 10 and 11) so the
+    app can match the theme. Returns None if the terminal does not answer."""
+    write("\x1b]10;?\x1b\\\x1b]11;?\x1b\\")
+    buf = b""
+    while select.select([fd], [], [], 0.3)[0]:
+        buf += os.read(fd, 256)
+        if buf.count(b"rgb:") >= 2:
+            break
+    colors = {}
+    for slot, name in ((b"10", "foreground"), (b"11", "background")):
+        m = re.search(rb"\x1b\]" + slot + rb";rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)", buf)
+        if m:
+            colors[name] = [int(part[:2], 16) for part in m.groups()] + [255]
+    return colors or None
+
+
 class Host:
     def __init__(self):
         self.fd = sys.stdin.fileno()
@@ -125,11 +145,6 @@ class Host:
         self.line_buf = b""
         self.pointer_in_app = False
         self.sock_path = f"/tmp/tui-host-{os.getpid()}.sock"
-
-    def relay(self, reply):
-        """The app asks the terminal things itself (its colours, for one) by writing
-        to the tty; only this program can read the answers, so they go back as is."""
-        self.send({"type": "terminal", "data": reply.decode("utf-8", "replace")})
 
     def region(self):
         rows, cols, _, _ = winsize()
@@ -212,6 +227,8 @@ class Host:
         if kind == "join":
             hello = self.size_message("hello")
             hello.update({"cell": list(self.cell), "imageId": IMAGE_ID, "transport": self.transport, "focused": True})
+            if self.colors:
+                hello["colors"] = self.colors
             self.send(hello)
         elif kind == "placed":
             self.grid = message
@@ -269,18 +286,6 @@ class Host:
                 continue
             if b.startswith(b"\x1b[6;") and len(b) < 16:
                 return
-            m = re.match(rb"\x1b\].*?(?:\x1b\\|\x07)", b, re.DOTALL)
-            if m:
-                self.buf = b[m.end():]
-                self.relay(m.group(0))
-                continue
-            if b.startswith(b"\x1b]") and len(b) < 256:
-                return
-            m = re.match(rb"\x1b\[\?[\d;]*[nu]|\x1b\[\d+;\d+;\d+t", b)
-            if m:
-                self.buf = b[m.end():]
-                self.relay(m.group(0))
-                continue
             if b.startswith(b"\x1b[<"):
                 m = re.match(rb"\x1b\[<\d+;\d+;\d+[Mm]", b)
                 if not m:
@@ -335,6 +340,7 @@ class Host:
         cell_w, cell_h, answered = query_cell_size(self.fd)
         self.cell = (cell_w, cell_h)
         self.transport = "file" if answered else "inline"
+        self.colors = query_colors(self.fd)
         self.pixel_mouse = supports_pixel_mouse(self.fd)
         write("\x1b[?1049h\x1b[?25l\x1b[2J\x1b[?1003h\x1b[?1006h" + ("\x1b[?1016h" if self.pixel_mouse else ""))
         self.draw_sidebar()

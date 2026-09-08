@@ -75,6 +75,8 @@ export interface Style {
   hoverColor?: Color;
   scrollbar?: ScrollbarStyle;
   wrap?: boolean;
+  /** [placeholder copy: When wrap is off, cut text that is wider than its box and end it with an ellipsis instead of clipping it mid-glyph.] */
+  ellipsis?: boolean;
   selectable?: boolean;
   selectionColor?: Color;
   /**
@@ -152,6 +154,7 @@ export function serializeStyle(style: Style): Record<string, unknown> {
     hoverBackground: parseColor(style.hoverBackground),
     hoverColor: parseColor(style.hoverColor),
     wrap: style.wrap,
+    ellipsis: style.ellipsis,
     selectable: style.selectable,
     selectionColor: parseColor(style.selectionColor),
     selectionMode: style.selectionMode,

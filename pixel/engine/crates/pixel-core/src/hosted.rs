@@ -21,8 +21,6 @@ pub(crate) struct HostState {
     pub(crate) cell: Option<(u32, u32)>,
     pub(crate) image_id: Option<u32>,
     pub(crate) transport: Option<String>,
-    // Terminal replies the host read on our behalf, parsed like tty input.
-    pub(crate) relayed: Vec<u8>,
 }
 
 pub(crate) struct Joined {
@@ -65,7 +63,6 @@ pub(crate) fn join(socket: &str, pane: &str, name: &str) -> io::Result<Joined> {
         }),
         image_id: value["imageId"].as_u64().map(|id| id as u32),
         transport: value["transport"].as_str().map(str::to_string),
-        relayed: Vec::new(),
     };
     let pending = reader.buffer().to_vec();
     let stream = reader.into_inner();
@@ -129,10 +126,6 @@ pub(crate) fn parse_line(line: &[u8], state: &mut HostState) -> Option<Event> {
         "colors" => {
             state.colors = colors_from(&value["colors"]);
             Some(Event::Colors(state.colors))
-        }
-        "terminal" => {
-            state.relayed.extend_from_slice(value["data"].as_str()?.as_bytes());
-            None
         }
         "adopt" => Some(Event::Handoff(Handoff::Adopt {
             tty: value["tty"].as_str()?.to_string(),
@@ -286,15 +279,7 @@ mod tests {
             cell: None,
             image_id: None,
             transport: None,
-            relayed: Vec::new(),
         }
-    }
-
-    #[test]
-    fn terminal_lines_queue_bytes_for_the_escape_parser() {
-        let mut state = state();
-        assert!(parse_line(br#"{"type":"terminal","data":"\u001b]11;rgb:ff/00/00\u001b\\"}"#, &mut state).is_none());
-        assert_eq!(state.relayed, b"\x1b]11;rgb:ff/00/00\x1b\\".to_vec());
     }
 
     #[test]

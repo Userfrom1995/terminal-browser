@@ -1,4 +1,3 @@
-// really? i guess that makes sense
 mod clipboard;
 mod compositor;
 mod doc;
@@ -77,8 +76,6 @@ pub struct HostConfig {
     pub socket: String,
     pub pane: String,
     pub name: String,
-    // Set when the host is not terminal-electron and frames should be drawn
-    // straight into this terminal as virtual placements.
     pub tty: Option<String>,
 }
 
@@ -372,6 +369,7 @@ impl Engine {
         let cell = term.cell_size()?.unwrap_or((16, 32));
         let window = window_from(&ws, cell);
         let base_px = px_for_cell_height(&config.fonts[config.cell_metrics_font], cell.1 as f32);
+        // look into this
         // Under a terminal-electron owner the owner pairs trackpad deltas and
         // forwards them; a foreign host only sends wheel ticks, so pair them here.
         let native = if term.is_hosted() && !term.is_embedded() {
@@ -865,6 +863,7 @@ impl Engine {
         self.push_resizes(resized);
         Ok(())
     }
+    // what
 
     // Moves the whole engine onto another terminal or owner: everything laid out
     // stays, only where pixels go and events come from changes.

@@ -217,3 +217,25 @@ mod tests {
         assert_eq!(lines, vec![0..0]);
     }
 }
+
+// Cuts a single line to fit `max_width` and ends it with an ellipsis, so a
+// label that is too wide reads as cut rather than as a different word. Returns
+// None when the whole line fits.
+pub fn ellipsize(text: &str, font: &fontdue::Font, px: f32, max_width: f32) -> Option<String> {
+    let measure = |s: &str| crate::canvas::measure_text(font, s, px);
+    if measure(text) <= max_width {
+        return None;
+    }
+    let mark = if font.lookup_glyph_index('\u{2026}') != 0 { "\u{2026}" } else { "..." };
+    let room = max_width - measure(mark);
+    let mut end = 0;
+    for (i, ch) in text.char_indices() {
+        let next = i + ch.len_utf8();
+        if measure(&text[..next]) > room {
+            break;
+        }
+        end = next;
+    }
+    Some(format!("{}{mark}", text[..end].trim_end()))
+}
+

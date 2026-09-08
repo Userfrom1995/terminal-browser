@@ -181,6 +181,7 @@ export interface PixelRoot {
   info: EngineInfo;
   sharedTextures: boolean;
   render(element: ReactNode): void;
+  flushSync<T>(fn: () => T): T;
   registerFont(path: string): Promise<number>;
   createSurface(): Surface;
   surfaceStats(): SurfaceStats;
@@ -286,6 +287,7 @@ export function createRoot(options: RootOptions = {}): PixelRoot {
   const info = JSON.parse(bridge.engine.info()) as EngineInfo;
   applyColors(info.colors);
   bridge.engine.setKeyEventTypes(!!options.keyEventTypes);
+  // what is this?
   // Any commit can move a node whose own component did not re-render, so the
   // rects are re-asked for after every commit rather than per component.
   if (options.onLayout) {
@@ -659,6 +661,9 @@ export function createRoot(options: RootOptions = {}): PixelRoot {
         ? createElement(ReactProfiler, { id: "pixel-app", onRender: onAppRender }, element)
         : element;
       reconciler.updateContainer(wrapped, root, null, null);
+    },
+    flushSync(fn) {
+      return reconciler.flushSync(fn);
     },
     registerFont(path: string) {
       const known = fontIds.get(path);

@@ -137,7 +137,7 @@ function App() {
           ref={left}
           src="https://github.com/zenbu-labs"
           style={{ flexGrow: 1, flexBasis: 0 }}
-          onState={setLeftState}
+          onChange={setLeftState}
         />
         <WebView
           ref={right}

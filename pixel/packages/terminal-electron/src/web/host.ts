@@ -4,6 +4,7 @@ import { allowClipboardRead, onDownloadFor, routeThroughProxy } from "./browser-
 import type { DownloadProgress } from "./browser-session";
 import { cursorShapeFor } from "./cursor";
 import { DevtoolsWindow } from "./devtools";
+import { FaviconCache } from "./favicon";
 import type { DevtoolsAction } from "./devtools";
 import { frameRate } from "./frame-rate";
 import { PageInput } from "./input";
@@ -91,6 +92,8 @@ export class PageHost {
   private readonly clipboardRead: boolean;
   private background: string;
   private pendingPopupSize: { width: number; height: number } | null = null;
+  private readonly favicons = new FaviconCache();
+  private faviconSeq = 0;
   private findText = "";
   private cdpAttached = false;
   private cdpEventHandlers = new Map<string, (params: unknown) => void>();
@@ -200,10 +203,14 @@ export class PageHost {
     );
     this.window.webContents.on("did-stop-loading", () => this.updateNavigation(false));
     this.window.webContents.on("did-navigate", (_event, url) => {
+      if (urlHost(url) !== urlHost(this.state.url)) this.updateState({ favicon: null });
       this.updateNavigation(this.state.loading, url);
     });
     this.window.webContents.on("did-navigate-in-page", (_event, url, mainFrame) => {
       if (mainFrame) this.updateNavigation(this.state.loading, url);
+    });
+    this.window.webContents.on("page-favicon-updated", (_event, favicons) => {
+      void this.loadFavicon(favicons);
     });
     this.window.webContents.on("page-title-updated", (_event, title) => {
       this.updateState({ title });
@@ -516,6 +523,12 @@ export class PageHost {
     this.window.webContents.invalidate();
   }
 
+  private async loadFavicon(urls: string[]) {
+    const seq = ++this.faviconSeq;
+    const file = await this.favicons.resolve(urls, this.window.webContents.session).catch(() => null);
+    if (file && seq === this.faviconSeq && !this.stopped) this.updateState({ favicon: file });
+  }
+
   private updateNavigation(loading: boolean, url = this.window.webContents.getURL()) {
     this.updateState({
       url,
@@ -625,4 +638,12 @@ function renderScaleFor(layout: SurfaceLayout) {
   if (!Number.isFinite(maxPixels) || maxPixels <= 0) return layout.scale;
   const cssPixels = layout.width * layout.height / (layout.scale * layout.scale);
   return Math.max(0.5, Math.min(layout.scale, Math.sqrt(maxPixels / cssPixels)));
+}
+
+function urlHost(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "";
+  }
 }

@@ -28,7 +28,8 @@ export default function Api() {
       <H3 id="root">What the root gives you</H3>
       <Rows
         rows={[
-          ["render(element)", "Show a React tree in the pane. Call it again to replace the tree, or keep state inside your components."],
+          ["loadURL(url, options?)  loadFile(path, options?)", "Show one page filling the pane, the way BrowserWindow.loadURL does. The first call creates the page, with any WebView props except src and style as options; later calls navigate it. Returns the page's handle, described under The ref below. Calling render afterwards replaces the page."],
+          ["render(element)", "Show a React tree in the pane, for anything beside a single page: your own toolbar, several pages, an app of your own. Call it again to replace the tree, or keep state inside your components."],
           ["stop(code?)", "Close every page, restore the terminal, then call onExit."],
           ["info", "Live numbers about the pane: width, height, cellWidth, cellHeight, basePx, whether the terminal reports full keyboard events (kittyKeyboard), whether this app is hosted by another, and the current colours."],
           ["displayScale", "Device pixels per CSS pixel that pages render at."],
@@ -57,7 +58,7 @@ export default function Api() {
           ["devtools?: boolean | \"right\" | \"bottom\"", "Right click menu, inspect shortcut and an in-view devtools dock. On unless NODE_ENV is production. Pass a side to say where the dock opens."],
           ["hidden?: boolean", "Keep the page alive but draw nothing and let it idle, like a background browser tab."],
           ["keepFrame?: boolean", "While the view is resizing, keep showing the last frame stretched instead of clearing to the background. Default true."],
-          ["onState?(state)", "The page's url, title, loading, canGoBack, canGoForward, findMatches and zoom, whenever any of them change."],
+          ["onChange?(state)", "The page's url, title, loading, canGoBack, canGoForward, findMatches, zoom and favicon, a path to the fetched icon file, whenever any of them change."],
           ["onOpenWindow", "What window.open and target=_blank links do. \"popup\" draws a popup over the view, \"navigate\" loads the URL in this view, \"deny\" ignores it. Pass a function to decide per request from Electron's handler details. By default a scripted popup (disposition new-window) becomes a popup and links open in this view."],
           ["onContextMenu?(params)", "Replace the default right click menu with your own."],
           ["onPointer?(event)  onDownload?(progress)", "Watch pointer events after the page receives them; follow downloads."],
@@ -68,6 +69,7 @@ export default function Api() {
       <Rows
         rows={[
           ["webContents", "Electron's WebContents for this page, for anything not listed below."],
+          ["state  onChange(listener)", "The latest state the page reported, and a subscription to changes that returns an unsubscribe function. The same object onChange on the component receives."],
           ["loadURL(url)  back()  forward()  reload()", "Navigation."],
           ["focus()  blur()", "Move keyboard focus to or away from this page."],
           ["zoom(direction)  find(text)  findNext(forward)  stopFind()", "Zoom in and out, and find in page."],
@@ -107,7 +109,7 @@ export default function Api() {
         maxHeight, padding, margin, gap, position (&quot;flow&quot; or &quot;absolute&quot;, with inset), overflow
         (&quot;visible&quot;, &quot;hidden&quot; or &quot;scroll&quot;), justifyContent, alignItems, background (a
         colour or a linear gradient), cornerRadius, border, color, fontSize, font, hoverBackground, hoverColor,
-        scrollbar, wrap and selectable. Colours are hex strings or [r, g, b, a] arrays.
+        scrollbar, wrap, ellipsis and selectable. With wrap off, ellipsis cuts text that does not fit its box and ends it with … instead of clipping it. Colours are hex strings or [r, g, b, a] arrays.
       </P>
       <H3 id="theme">Colours and theme</H3>
       <Rows

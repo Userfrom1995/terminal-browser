@@ -1907,3 +1907,19 @@ fn unwrapped_input_does_not_grow_past_its_flex_width() {
     let width = tree.content_width(id).unwrap();
     assert!(width <= 100.0, "input clamped to the row, got {width}");
 }
+
+#[test]
+fn ellipsize_cuts_to_width_and_marks_the_cut() {
+    let font = font();
+    let px = 16.0;
+    let full = "GitHub - zenbu-labs";
+    let whole = crate::canvas::measure_text(&font, full, px);
+    assert_eq!(crate::wrap::ellipsize(full, &font, px, whole), None);
+    let room = crate::canvas::measure_text(&font, "GitHub - zen", px);
+    let cut = crate::wrap::ellipsize(full, &font, px, room).expect("too wide, so cut");
+    assert!(cut.ends_with('\u{2026}') || cut.ends_with("..."), "{cut}");
+    assert!(cut.starts_with("GitHub"), "{cut}");
+    assert!(crate::canvas::measure_text(&font, &cut, px) <= room, "{cut} does not fit");
+    assert!(cut.len() < full.len());
+}
+

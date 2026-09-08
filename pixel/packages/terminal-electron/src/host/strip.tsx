@@ -66,6 +66,7 @@ export function PaneShell({ shell, children }: { shell: Shell; children: ReactNo
                   fontSize: rem * 0.82,
                   color: current ? theme.fg : theme.muted,
                   wrap: false,
+                  ellipsis: true,
                   selectable: false,
                   overflow: "hidden",
                 }}

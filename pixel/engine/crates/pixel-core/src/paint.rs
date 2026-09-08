@@ -428,16 +428,34 @@ fn paint_node(
                     }
                     let baseline = (top + line_metrics.ascent) as i32;
                     if node.spans.is_empty() {
-                        canvas.draw_marked(
-                            font,
-                            text,
-                            line.clone(),
-                            origin.0 as i32,
-                            baseline,
-                            px,
-                            color,
-                            marks,
-                        );
+                        let cut = (node.style.ellipsis && !node.style.wrap && marks.is_empty() && node.input.is_none())
+                            .then(|| {
+                                let room = (rect.w - padding.0 - padding.2).max(0.0);
+                                crate::wrap::ellipsize(&text[line.clone()], font, px, room)
+                            })
+                            .flatten();
+                        match cut {
+                            Some(shown) => canvas.draw_marked(
+                                font,
+                                &shown,
+                                0..shown.len(),
+                                origin.0 as i32,
+                                baseline,
+                                px,
+                                color,
+                                &[],
+                            ),
+                            None => canvas.draw_marked(
+                                font,
+                                text,
+                                line.clone(),
+                                origin.0 as i32,
+                                baseline,
+                                px,
+                                color,
+                                marks,
+                            ),
+                        }
                         continue;
                     }
                     let mut x = origin.0;
