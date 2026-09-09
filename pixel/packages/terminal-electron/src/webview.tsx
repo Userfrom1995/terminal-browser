@@ -55,8 +55,6 @@ export interface WebViewProps {
   partition?: string;
   /** [placeholder copy: Lets the page read the clipboard.] */
   clipboardRead?: boolean;
-  /** [placeholder copy: Renders the page over a transparent backdrop, so where the page itself paints nothing the terminal shows through. Pair it with a transparent root.] */
-  transparent?: boolean;
   /** [placeholder copy: Chromium proxy rules for this page's traffic, for example socks5://127.0.0.1:1080. A proxy applies to the whole storage partition, so give a proxied view its own partition.] */
   proxy?: string;
   /** [placeholder copy: Electron BrowserWindow options, webPreferences included, passed to the offscreen window behind this view and its popups. Only what the view has to control is excluded: size, visibility, offscreen rendering, dialogs and background throttling.] */
@@ -269,7 +267,6 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
         url: initial.src,
         background: registry.background(),
         clipboardRead: !!initial.clipboardRead,
-        transparent: !!initial.transparent,
         proxy: initial.proxy ?? null,
         browserWindowOptions,
       },
@@ -560,7 +557,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
             width: page.width,
             height: page.height,
             cornerRadius: props.style?.cornerRadius,
-            background: props.transparent ? undefined : theme.bg,
+            background: theme.bg,
           }}
           onPointer={(event: PointerEvent) => {
             if (menuRef.current) {

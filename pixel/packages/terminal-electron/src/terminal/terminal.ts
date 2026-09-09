@@ -19,6 +19,7 @@ export interface PaneContext {
 
 export interface ListPanesOptions {
   commands?: (command: string) => boolean;
+  tty?: string | null;
 }
 
 export interface SplitRequest {

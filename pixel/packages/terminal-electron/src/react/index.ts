@@ -173,7 +173,6 @@ export interface RootOptions {
   onHandoff?: (handoff: { tty?: string; socket?: string }) => void;
   keyEventTypes?: boolean;
   devtools?: boolean;
-  transparent?: boolean;
   cwd?: string;
   tty?: string;
   host?: HostOptions;
@@ -628,12 +627,6 @@ export function createRoot(options: RootOptions = {}): PixelRoot {
 
   if (!devtoolsEnabled || options.onRightClick) {
     bridge.push(APP_VIEW, { op: "setDefaultMenu", on: false });
-    bridge.flush();
-  }
-  // An alpha of zero leaves the terminal's own background showing through
-  // wherever the tree paints nothing.
-  if (options.transparent) {
-    bridge.push(APP_VIEW, { op: "setClearColor", color: [0, 0, 0, 0] });
     bridge.flush();
   }
 

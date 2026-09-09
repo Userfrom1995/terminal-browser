@@ -396,7 +396,7 @@ impl Engine {
                 }
             ),
         );
-        let mut engine = Self {
+        let engine = Self {
             term,
             session_env: config.session_env,
             comp: Compositor::new(window),
@@ -458,7 +458,6 @@ impl Engine {
             frame_budget_bytes_per_sec: frame_budget_bytes_per_sec(),
             stats: FrameStats::default(),
         };
-        engine.sync_clear_colors();
         Ok(engine)
     }
 
@@ -491,23 +490,9 @@ impl Engine {
         let Some(v) = self.comp.views.get_mut(view) else {
             return;
         };
-        v.clear_color_owned = true;
         if v.clear_color != color {
             v.clear_color = color;
             v.tree.mark_paint();
-        }
-    }
-
-    fn sync_clear_colors(&mut self) {
-        let Some(background) = self.colors.background else {
-            return;
-        };
-        for view in &mut self.comp.views {
-            if view.clear_color_owned || view.clear_color == background {
-                continue;
-            }
-            view.clear_color = background;
-            view.tree.mark_paint();
         }
     }
 
@@ -797,7 +782,6 @@ impl Engine {
             "engine",
             format!("colors changed, background {:?}", colors.background),
         );
-        self.sync_clear_colors();
         for view in &mut self.comp.views {
             view.tree.mark_paint();
         }

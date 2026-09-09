@@ -257,7 +257,7 @@ export const ghostty: Detect = (env, run) => {
   }
 
   async function listPanesMatching(options?: ListPanesOptions): Promise<PaneDetails[]> {
-    const listed = await listPanes();
+    const listed = await listPanes(options?.tty ?? null);
     if (!options?.commands || listed.some((pane) => pane.tty)) return listed;
     const running = await ttysRunning(options.commands);
     await mapTtys([...running.keys()], listed, (tty) => processCwd(running.get(tty)!.pid));

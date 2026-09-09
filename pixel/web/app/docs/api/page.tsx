@@ -22,7 +22,6 @@ export default function Api() {
           ["onFocus?(focused)", "The terminal window itself gained or lost focus."],
           ["onResize?({ width, height, basePx })", "The pane changed size, or the terminal's font size changed."],
           ["onColors?(colors)", "The terminal reported its colours, on start and whenever its theme changes."],
-          ["transparent?: boolean", "[placeholder copy: Clear the pane to transparent instead of the terminal's background colour, so wherever your tree paints nothing the terminal shows through. Pages need transparent on the WebView as well.]"],
           ["tty?: string  sessionEnv?: object", "Draw on a different terminal device than the current one, reading terminal settings from that environment. Only needed by daemons that serve several panes from one process."],
           ["cwd?: string", "[placeholder copy: The directory this session belongs to, for files the app writes on the user's behalf such as exported devtools profiles. Defaults to the process cwd; a daemon passes the cwd of whoever asked it to open.]"],
         ]}
@@ -60,7 +59,6 @@ export default function Api() {
           ["devtools?: boolean | \"right\" | \"bottom\"", "Right click menu, inspect shortcut and an in-view devtools dock. On unless NODE_ENV is production. Pass a side to say where the dock opens."],
           ["hidden?: boolean", "Keep the page alive but draw nothing and let it idle, like a background browser tab."],
           ["keepFrame?: boolean", "While the view is resizing, keep showing the last frame stretched instead of clearing to the background. Default true."],
-          ["transparent?: boolean", "[placeholder copy: Render the page over a transparent backdrop: where the page paints nothing, the terminal shows through. Off by default; the page's own background still applies, so only pages with a transparent body show anything.]"],
           ["onChange?(state)", "The page's url, title, loading, canGoBack, canGoForward, findMatches, zoom and favicon, a path to the fetched icon file, whenever any of them change."],
           ["onOpenWindow", "What window.open and target=_blank links do. \"popup\" draws a popup over the view, \"navigate\" loads the URL in this view, \"deny\" ignores it. Pass a function to decide per request from Electron's handler details. By default a scripted popup (disposition new-window) becomes a popup and links open in this view."],
           ["onContextMenu?(params)", "Replace the default right click menu with your own."],

@@ -351,3 +351,19 @@ test("ghostty asks the owning instance for a split's neighbor by window and tab"
   assert.deepEqual(found, { id: "BBBB", tab: "w1:t1" });
   assert.equal(commands[1], `osascript -l JavaScript - ${process.ppid} neighbor w1 t1 AAAA right`);
 });
+
+test("ghostty lists panes through the caller's tty when the process has no ghostty ancestor", onMac, async () => {
+  const { run, commands } = recorder({
+    "ps -axo pid=,ppid=,tty=,command=": processTable([
+      [process.pid, 1, "??", "node daemon"],
+      [7000, 1, "??", GHOSTTY_BIN],
+      [7001, 7000, "ttys009", "login"],
+      [7002, 7001, "ttys009", "-zsh"],
+      [8000, 1, "??", `${GHOSTTY_BIN} -e probe`],
+    ]),
+    "osascript -l JavaScript - 7000 list": "w1\tt1\tAAAA\t\t/dev/ttys009\t/Users/me\n",
+  });
+  const panes = await detect(GHOSTTY_ENV, run).listPanes({ commands: () => true, tty: "/dev/ttys009" });
+  assert.deepEqual(panes, [{ id: "AAAA", tab: "w1:t1", tty: "/dev/ttys009", command: null }]);
+  assert.ok(commands.includes("osascript -l JavaScript - 7000 list"));
+});

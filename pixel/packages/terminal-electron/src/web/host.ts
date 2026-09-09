@@ -41,7 +41,6 @@ function windowOptions(
   passthrough: BrowserWindowOptions,
   size: { width: number; height: number },
   offscreen: Electron.WebPreferences["offscreen"],
-  transparent: boolean,
 ): Electron.BrowserWindowConstructorOptions {
   const { webPreferences, ...window } = passthrough;
   return {
@@ -50,7 +49,6 @@ function windowOptions(
     fullscreenable: false,
     resizable: false,
     acceptFirstMouse: true,
-    ...(transparent ? { transparent: true, backgroundColor: "#00000000" } : {}),
     ...window,
     width: size.width,
     height: size.height,
@@ -75,7 +73,6 @@ export interface HostOptions {
   url: string;
   background: string;
   clipboardRead: boolean;
-  transparent: boolean;
   proxy: string | null;
   browserWindowOptions: BrowserWindowOptions;
 }
@@ -146,7 +143,7 @@ export class PageHost {
     this.state = initialWebViewState(options.url);
     const size = this.contentSize(layout);
     this.window = new BrowserWindow(
-      windowOptions(this.browserWindowOptions, size, offscreenPreferences(this.renderScale), options.transparent),
+      windowOptions(this.browserWindowOptions, size, offscreenPreferences(this.renderScale)),
     );
     prepareSession(this.window.webContents.session);
     if (options.proxy) void routeThroughProxy(this.window.webContents.session, options.proxy);
@@ -572,12 +569,10 @@ export class PageHost {
     this.pendingPopupSize = size;
     return {
       action: "allow",
-      overrideBrowserWindowOptions: windowOptions(
-        this.browserWindowOptions,
-        size,
-        { useSharedTexture: false, deviceScaleFactor: this.renderScale },
-        false,
-      ),
+      overrideBrowserWindowOptions: windowOptions(this.browserWindowOptions, size, {
+        useSharedTexture: false,
+        deviceScaleFactor: this.renderScale,
+      }),
     };
   }
 
