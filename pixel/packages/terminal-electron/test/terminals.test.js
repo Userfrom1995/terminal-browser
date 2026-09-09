@@ -99,34 +99,6 @@ test("plain ghostty is still ghostty", () => {
   assert.equal(detect(GHOSTTY_LOOKALIKE, async () => "")?.name, "ghostty");
 });
 
-test("herdr falls back when the running herdr predates --right-click", async () => {
-  const env = { HERDR_PANE_ID: "w1:p1", HERDR_TAB_ID: "w1:t1" };
-  const commands = [];
-  const run = async (bin, args) => {
-    commands.push([bin, ...args].join(" "));
-    if (args.includes("--right-click")) {
-      const error = new Error("unknown option: --right-click");
-      error.stderr = "unknown option: --right-click\n";
-      throw error;
-    }
-    if (args[0] === "pane" && args[1] === "split") {
-      return JSON.stringify({ result: { pane: { pane_id: "w1:p2" } } });
-    }
-    return "";
-  };
-  await detect(env, run).split({
-    from: { id: "w1:p1", tab: "w1:t1" },
-    direction: "right",
-    command: ["terminal-browser", "open"],
-    size: null,
-    tty: null,
-  });
-  assert.deepEqual(commands, [
-    "herdr pane split --pane w1:p1 --direction right --focus --right-click pane",
-    "herdr pane split --pane w1:p1 --direction right --focus",
-    "herdr pane run w1:p2 terminal-browser open",
-  ]);
-});
 
 function tempHerdrConfig(initialContent) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "herdr-cfg-"));
@@ -277,4 +249,105 @@ test("cmux uses pane frames from the socket and answers with the neighbor's show
   assert.equal(await terminal.neighbor(from, "left"), null);
   assert.deepEqual(await terminal.neighbor({ id: "s-c", tab: "ws-1" }, "up"), { id: "s-b2", tab: "ws-1" });
   assert.deepEqual(await terminal.neighbor({ id: "s-b1", tab: "ws-1" }, "left"), { id: "s-a", tab: "ws-1" });
+});
+
+const GHOSTTY_ENV = {
+  TERM: "xterm-ghostty",
+  TERM_PROGRAM: "ghostty",
+  TERM_PROGRAM_VERSION: "1.3.1",
+  GHOSTTY_RESOURCES_DIR: "/Applications/Ghostty.app/Contents/Resources/ghostty",
+};
+const onMac = { skip: process.platform !== "darwin" };
+const GHOSTTY_BIN = "/Applications/Ghostty.app/Contents/MacOS/ghostty";
+const processTable = (rows) => rows.map((row) => row.join(" ")).join("\n") + "\n";
+
+// a test process lives under whatever launched node, so the pretend ghostty is grafted
+// in as our own parent to get a shell -> ghostty ancestry without knowing the real tree
+test("ghostty scripts the instance this shell runs inside, not the newest one", onMac, async () => {
+  const { run, commands } = recorder({
+    "ps -axo pid=,ppid=,tty=,command=": processTable([
+      [process.pid, process.ppid, "ttys001", "node test"],
+      [process.ppid, 1, "??", GHOSTTY_BIN],
+      [9001, 1, "??", `${GHOSTTY_BIN} -e sh -c python3 probe.py`],
+    ]),
+    [`osascript -l JavaScript - ${process.ppid} list`]: "w1\tt1\tAAAA\t\t\t/Users/me\n",
+  });
+  const terminal = detect(GHOSTTY_ENV, run);
+  assert.deepEqual(await terminal.listPanes(), [
+    { id: "AAAA", tab: "w1:t1", tty: null, command: null },
+  ]);
+  assert.ok(commands.includes(`osascript -l JavaScript - ${process.ppid} list`));
+});
+
+test("ghostty falls back to the only instance when this shell is not inside one", onMac, async () => {
+  const { run, commands } = recorder({
+    "ps -axo pid=,ppid=,tty=,command=": processTable([
+      [process.pid, 1, "ttys001", "node test"],
+      [7000, 1, "??", GHOSTTY_BIN],
+    ]),
+    "osascript -l JavaScript - 7000 list": "w1\tt1\tAAAA\t\t\t/Users/me\n",
+  });
+  await detect(GHOSTTY_ENV, run).listPanes();
+  assert.ok(commands.includes("osascript -l JavaScript - 7000 list"));
+});
+
+test("ghostty finds the instance through the caller tty when ancestry does not reach one", onMac, async () => {
+  const { run, commands } = recorder({
+    "ps -axo pid=,ppid=,tty=,command=": processTable([
+      [process.pid, 1, "??", "node daemon"],
+      [7000, 1, "??", GHOSTTY_BIN],
+      [7001, 7000, "ttys009", "login"],
+      [7002, 7001, "ttys009", "-zsh"],
+      [8000, 1, "??", `${GHOSTTY_BIN} -e probe`],
+    ]),
+    "osascript -l JavaScript - 7000 list": "w1\tt1\tAAAA\t\t/dev/ttys009\t/Users/me\n",
+  });
+  const pane = await detect(GHOSTTY_ENV, run).getCurrentPane({ tty: "/dev/ttys009", cwd: "/" });
+  assert.deepEqual(pane, { id: "AAAA", tab: "w1:t1", tty: "/dev/ttys009", command: null });
+  assert.ok(commands.includes("osascript -l JavaScript - 7000 list"));
+});
+
+test("ghostty refuses to guess between instances it cannot connect to this shell", onMac, async () => {
+  const { run } = recorder({
+    "ps -axo pid=,ppid=,tty=,command=": processTable([
+      [process.pid, 1, "ttys001", "node test"],
+      [7000, 1, "??", GHOSTTY_BIN],
+      [8000, 1, "??", `${GHOSTTY_BIN} -e probe`],
+    ]),
+  });
+  await assert.rejects(detect(GHOSTTY_ENV, run).listPanes(), /2 Ghostty processes.*7000, 8000/);
+});
+
+test("ghostty splits through the owning instance with the direction code", onMac, async () => {
+  const { run, commands } = recorder({
+    "ps -axo pid=,ppid=,tty=,command=": processTable([
+      [process.pid, process.ppid, "ttys001", "node test"],
+      [process.ppid, 1, "??", GHOSTTY_BIN],
+    ]),
+    [`osascript -l JavaScript - ${process.ppid} split AAAA GSrt ${process.cwd()} terminal-electron open\n`]: "BBBB",
+  });
+  await detect(GHOSTTY_ENV, run).split({
+    from: { id: "AAAA", tab: "w1:t1" },
+    direction: "right",
+    command: ["terminal-electron", "open"],
+    size: null,
+    tty: null,
+  });
+  assert.deepEqual(commands, [
+    "ps -axo pid=,ppid=,tty=,command=",
+    `osascript -l JavaScript - ${process.ppid} split AAAA GSrt ${process.cwd()} terminal-electron open\n`,
+  ]);
+});
+
+test("ghostty asks the owning instance for a split's neighbor by window and tab", onMac, async () => {
+  const { run, commands } = recorder({
+    "ps -axo pid=,ppid=,tty=,command=": processTable([
+      [process.pid, process.ppid, "ttys001", "node test"],
+      [process.ppid, 1, "??", GHOSTTY_BIN],
+    ]),
+    [`osascript -l JavaScript - ${process.ppid} neighbor w1 t1 AAAA right`]: "BBBB\n",
+  });
+  const found = await detect(GHOSTTY_ENV, run).neighbor({ id: "AAAA", tab: "w1:t1" }, "right");
+  assert.deepEqual(found, { id: "BBBB", tab: "w1:t1" });
+  assert.equal(commands[1], `osascript -l JavaScript - ${process.ppid} neighbor w1 t1 AAAA right`);
 });

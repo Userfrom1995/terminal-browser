@@ -46,10 +46,10 @@
   },
   "scripts": {
     "postinstall": "node scripts/postinstall.mjs",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && cp src/terminal/terminals/ghostty.jxa dist/terminal/terminals/",
     "build:native": "node scripts/build-native.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "tsc -p tsconfig.json && node --test \"test/*.test.js\""
+    "test": "npm run build && node --test \"test/*.test.js\""
   },
   "dependencies": {
     "react-reconciler": "^0.29.2"

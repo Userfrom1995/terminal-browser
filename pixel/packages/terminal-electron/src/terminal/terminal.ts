@@ -18,7 +18,6 @@ export interface PaneContext {
 }
 
 export interface ListPanesOptions {
-  /** [placeholder copy: When given, panes whose tty runs a matching command get their tty and command filled in even on terminals that do not report ttys directly.] */
   commands?: (command: string) => boolean;
 }
 
@@ -66,7 +65,6 @@ export interface Terminal {
    */
   split?(request: SplitRequest): Promise<void>;
   listPanes?(options?: ListPanesOptions): Promise<PaneDetails[]>;
-  /** [placeholder copy: The pane directly beside `from` in a direction, or null when the edge of the tab is there. Lets a launcher tell whether a --split would land next to a pane it already owns.] */
   neighbor?(from: Pane, direction: Direction): Promise<Pane | null>;
   sendText?(pane: string, text: string): Promise<void>;
   focusPane?(pane: string): Promise<void>;

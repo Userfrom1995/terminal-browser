@@ -17,9 +17,6 @@ export interface PaneRect {
   bottom: number;
 }
 
-// Picks the pane whose edge touches `from` on the given side, allowing for the
-// one-cell divider terminals draw between panes. Among several, the one that
-// shares the most edge wins.
 export function adjacentPane(
   from: PaneRect,
   candidates: PaneRect[],
