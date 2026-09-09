@@ -182,7 +182,7 @@ impl Engine {
                 let view = self.comp.view_at(point.0);
                 let local = self.comp.to_local(view, point);
                 self.active_view = view;
-                if self.default_menu {
+                if self.default_menu && !self.comp.views[view].tree.surface_at(local.0, local.1) {
                     self.open_menu(view, local);
                 }
                 out.push(EngineEvent::RightClick {

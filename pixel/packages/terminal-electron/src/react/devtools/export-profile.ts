@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { devtoolsStore, engineLogs } from "./stores";
 import { profilerStore, ProfileSession, TimeSpan } from "./stores";
@@ -228,10 +228,18 @@ export function exportProfile(): string | null {
     .replace(/[:.]/g, "-")
     .replace("T", "-")
     .slice(0, 19);
-  const dir = "profiles";
+  const dir = join(profileBase, "profiles");
   mkdirSync(dir, { recursive: true });
   const path = join(dir, `devtools-profile-${stamp}.json`);
   writeFileSync(path, JSON.stringify(document, null, 1));
   engineLogs.push("info", "profiler", `profile exported to ${path}`);
   return path;
+}
+
+// A daemon's own cwd means nothing to the person who launched it, so the app
+// names the directory exports are relative to; it defaults to the process cwd.
+let profileBase = process.cwd();
+
+export function setProfileDirectory(base: string): void {
+  profileBase = resolve(base);
 }

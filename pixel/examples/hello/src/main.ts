@@ -5,7 +5,7 @@ const partition = process.argv[3] ?? process.env.HELLO_PARTITION;
 
 const root = createRoot({
   onKey(event) {
-    if (event.kind === "press" && event.mods.ctrl && event.key === "q") {
+    if (event.kind === "press" && event.mods.ctrl && event.key === "c") {
       root.stop();
       return true;
     }

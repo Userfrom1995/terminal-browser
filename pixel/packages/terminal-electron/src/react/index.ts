@@ -26,7 +26,9 @@ import {
   toggleDevtools,
   unmountDevtools,
 } from "./devtools/controller";
+import { setProfileDirectory } from "./devtools/export-profile";
 import { installFiberHook } from "./devtools/fiber-hook";
+import type { Rgba } from "./native";
 import { publishColors } from "./colors";
 import { refreshTheme } from "./devtools/theme";
 import {
@@ -171,6 +173,8 @@ export interface RootOptions {
   onHandoff?: (handoff: { tty?: string; socket?: string }) => void;
   keyEventTypes?: boolean;
   devtools?: boolean;
+  transparent?: boolean;
+  cwd?: string;
   tty?: string;
   host?: HostOptions;
   wrapper?: "tmux";
@@ -192,6 +196,7 @@ export interface PixelRoot {
   nudgeResize(): void;
   queryLayout(): void;
   setPointerShape(shape: string): void;
+  setClearColor(color: Rgba): void;
   setKeyCapture(keys: string[]): void;
   requestClipboardImage(): void;
   setClipboard(text: string): void;
@@ -280,6 +285,7 @@ export function createRoot(options: RootOptions = {}): PixelRoot {
       ? new Bridge(options.tty, options.wrapper, options.sessionEnv, options.host)
       : getBridge(options.wrapper);
   const devtoolsEnabled = options.devtools !== false && bridge === getBridge();
+  if (options.cwd) setProfileDirectory(options.cwd);
   let devtoolsInstalled = false;
   const enableDevtools = () => {
     if (devtoolsInstalled || bridge !== getBridge()) return;
@@ -624,6 +630,12 @@ export function createRoot(options: RootOptions = {}): PixelRoot {
     bridge.push(APP_VIEW, { op: "setDefaultMenu", on: false });
     bridge.flush();
   }
+  // An alpha of zero leaves the terminal's own background showing through
+  // wherever the tree paints nothing.
+  if (options.transparent) {
+    bridge.push(APP_VIEW, { op: "setClearColor", color: [0, 0, 0, 0] });
+    bridge.flush();
+  }
 
   /**
    * 
@@ -714,6 +726,10 @@ export function createRoot(options: RootOptions = {}): PixelRoot {
     },
     setPointerShape(shape: string) {
       bridge.push(APP_VIEW, { op: "setPointerShape", shape });
+      bridge.flush();
+    },
+    setClearColor(color: Rgba) {
+      bridge.push(APP_VIEW, { op: "setClearColor", color });
       bridge.flush();
     },
     setKeyCapture(keys: string[]) {

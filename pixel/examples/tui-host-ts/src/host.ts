@@ -193,7 +193,7 @@ class Host {
   drawSidebar() {
     const { rows } = winsize();
     const lines = [
-      " ctrl+q  quit",
+      " ctrl+c  quit",
       " ctrl+d  engine devtools",
     ];
     for (let r = 0; r < rows; r++) {
@@ -359,7 +359,7 @@ class Host {
         continue;
       }
       const ch = b[0];
-      if (ch === 0x11) {
+      if (ch === 0x03) {
         this.stop();
         return;
       }

@@ -7,7 +7,7 @@ const url = args.find((arg) => !arg.startsWith("--")) ?? "https://example.com";
 
 const root = createRoot({
   onKey(event) {
-    if (event.kind === "press" && event.mods.ctrl && event.key === "q") {
+    if (event.kind === "press" && event.mods.ctrl && event.key === "c") {
       root.stop();
       return true;
     }

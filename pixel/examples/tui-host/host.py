@@ -135,7 +135,7 @@ class Host:
     def draw_sidebar(self):
         rows, cols, _, _ = winsize()
         lines = [
-            " ctrl+q  quit",
+            " ctrl+c  quit",
         ]
         for r in range(rows):
             text = lines[r] if r < len(lines) else ""
@@ -281,7 +281,7 @@ class Host:
                 self.buf = b[1:]
                 continue
             ch = b[:1]
-            if ch == b"\x11":
+            if ch == b"\x03":
                 raise KeyboardInterrupt
             if ch == b"\r":
                 self.key("enter")

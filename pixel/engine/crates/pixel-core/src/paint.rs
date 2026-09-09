@@ -81,6 +81,13 @@ pub fn paint(
         let mut surface_occluders = Vec::new();
         collect_surface_occluders(tree, tree.root(), None, canvas, &mut surface_occluders);
         if let Some((region, color)) = clear {
+            let alpha = u32::from(color[3]);
+            let color = [
+                ((u32::from(color[0]) * alpha + 127) / 255) as u8,
+                ((u32::from(color[1]) * alpha + 127) / 255) as u8,
+                ((u32::from(color[2]) * alpha + 127) / 255) as u8,
+                color[3],
+            ];
             crate::profiler::span("canvas.clear", || {
                 canvas.fill_rect(region.x, region.y, region.w, region.h, color);
             });

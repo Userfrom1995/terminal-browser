@@ -211,15 +211,40 @@ impl Canvas {
     }
 
     pub fn fill_rect(&mut self, x: u32, y: u32, w: u32, h: u32, color: [u8; 4]) {
+        for (fx1, fy1, fx2, fy2) in self.rect_fragments(x, y, w, h) {
+            self.fill_rows(fx1, fy1, fx2, fy2, color);
+        }
+    }
+
+    fn blend_rect(&mut self, x: u32, y: u32, w: u32, h: u32, color: [u8; 4]) {
+        let alpha = color[3];
+        let premultiplied = [
+            ((u32::from(color[0]) * u32::from(alpha) + 127) / 255) as u8,
+            ((u32::from(color[1]) * u32::from(alpha) + 127) / 255) as u8,
+            ((u32::from(color[2]) * u32::from(alpha) + 127) / 255) as u8,
+            alpha,
+        ];
+        for (fx1, fy1, fx2, fy2) in self.rect_fragments(x, y, w, h) {
+            let row_len = ((fx2 - fx1) * 4) as usize;
+            for row in fy1..fy2 {
+                let start = ((row * self.width + fx1) * 4) as usize;
+                for px in self.pixels[start..start + row_len].chunks_exact_mut(4) {
+                    blend_pixel(px, &premultiplied, alpha);
+                }
+            }
+        }
+    }
+
+    fn rect_fragments(&mut self, x: u32, y: u32, w: u32, h: u32) -> Vec<(u32, u32, u32, u32)> {
         let (cx1, cy1, cx2, cy2) = self.clip_bounds();
         let x1 = x.clamp(cx1, cx2);
         let y1 = y.clamp(cy1, cy2);
         let x2 = x.saturating_add(w).clamp(x1, cx2);
         let y2 = y.saturating_add(h).clamp(y1, cy2);
         if x2 <= x1 || y2 <= y1 {
-            return;
+            return Vec::new();
         }
-   
+
         let mut fragments = vec![(x1, y1, x2, y2)];
         if !self.occluders.is_empty() {
             let mut split = Vec::new();
@@ -239,9 +264,7 @@ impl Canvas {
                 tally(|s| &s.boxes_clipped_out);
             }
         }
-        for (fx1, fy1, fx2, fy2) in fragments {
-            self.fill_rows(fx1, fy1, fx2, fy2, color);
-        }
+        fragments
     }
 
     fn fill_rows(&mut self, x1: u32, y1: u32, x2: u32, y2: u32, color: [u8; 4]) {
@@ -530,16 +553,24 @@ impl Canvas {
         if w <= 0.0 || h <= 0.0 || self.clipped_out(x, y, w, h) || self.occluded(x, y, w, h) {
             return;
         }
+        if color[3] == 0 {
+            return;
+        }
         let max_radius = radius.iter().fold(0.0f32, |a, &r| a.max(r));
         if self.fill_large_rounded_rect(x, y, w, h, radius, max_radius, color) {
             return;
         }
-        if max_radius.min(w / 2.0).min(h / 2.0) < 0.5 && color[3] == 255 {
+        if max_radius.min(w / 2.0).min(h / 2.0) < 0.5 {
             let x1 = x.round().max(0.0) as u32;
             let y1 = y.round().max(0.0) as u32;
             let x2 = (x + w).round().max(0.0) as u32;
             let y2 = (y + h).round().max(0.0) as u32;
-            self.fill_rect(x1, y1, x2.saturating_sub(x1), y2.saturating_sub(y1), color);
+            let (rw, rh) = (x2.saturating_sub(x1), y2.saturating_sub(y1));
+            if color[3] == 255 {
+                self.fill_rect(x1, y1, rw, rh, color);
+            } else {
+                self.blend_rect(x1, y1, rw, rh, color);
+            }
             return;
         }
         if let Some(path) = rounded_rect_path(x, y, w, h, radius) {

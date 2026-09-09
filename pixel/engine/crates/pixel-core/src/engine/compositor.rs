@@ -195,8 +195,9 @@ impl Compositor {
                 continue;
             }
             let origin = self.views[view].origin_x;
+            let straighten = self.views[view].clear_color[3] < 255;
             let (canvas, frame) = (&self.views[view].canvas, &mut self.frame);
-            blit(frame, canvas, origin, rect);
+            blit(frame, canvas, origin, rect, straighten);
         }
         self.draw_divider();
     }
@@ -227,7 +228,7 @@ impl Compositor {
     }
 }
 
-fn blit(dst: &mut Canvas, src: &Canvas, origin_x: u32, region: Rect) {
+fn blit(dst: &mut Canvas, src: &Canvas, origin_x: u32, region: Rect, straighten: bool) {
     let region = region.clamped(src.width, src.height);
     let dst_x = origin_x + region.x;
     if region.is_empty() || dst_x >= dst.width || region.y >= dst.height {
@@ -250,8 +251,18 @@ fn blit(dst: &mut Canvas, src: &Canvas, origin_x: u32, region: Rect) {
             for r in 0..count {
                 let src_start = (y0 + first + r) * src_stride + src_col;
                 let dst_start = r * dst_stride + dst_col;
-                band[dst_start..dst_start + cols]
-                    .copy_from_slice(&src.pixels[src_start..src_start + cols]);
+                let row = &mut band[dst_start..dst_start + cols];
+                row.copy_from_slice(&src.pixels[src_start..src_start + cols]);
+                if straighten {
+                    for px in row.chunks_exact_mut(4) {
+                        let a = px[3];
+                        if a != 0 && a != 255 {
+                            for c in &mut px[..3] {
+                                *c = ((u32::from(*c) * 255 + u32::from(a) / 2) / u32::from(a)).min(255) as u8;
+                            }
+                        }
+                    }
+                }
             }
         },
         |(), ()| (),

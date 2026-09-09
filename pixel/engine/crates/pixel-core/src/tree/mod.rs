@@ -1384,6 +1384,13 @@ impl Tree {
         None
     }
 
+    pub fn surface_at(&self, x: f32, y: f32) -> bool {
+        self.paint_order.iter().rev().any(|&id| {
+            self.get(id)
+                .is_some_and(|node| node.surface.is_some() && node.visible.contains(x, y))
+        })
+    }
+
     pub(crate) fn selectable_text_leaf(&self, id: NodeId) -> bool {
         let Some(node) = self.get(id) else {
             return false;

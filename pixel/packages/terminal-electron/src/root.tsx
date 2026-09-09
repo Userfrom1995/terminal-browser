@@ -46,7 +46,6 @@ export interface RootOptions
     | "onKey"
     | "onEngineExit"
     | "onLayout"
-    | "devtools"
     | "host"
     | "onHostClosed"
     | "onHandoff"
@@ -201,7 +200,9 @@ export function createRoot(options: RootOptions = {}): Root {
         : undefined,
     wrapper: options.wrapper ?? (owner || embed ? undefined : terminal?.wrapper),
     keyEventTypes: true,
-    devtools: false,
+    // Engine devtools (right-click menu, inspect, profiler) follow the WebView
+    // default: on while developing, off in production builds.
+    devtools: options.devtools ?? process.env.NODE_ENV !== "production",
     onKey: (event) => {
       if (shell.handleKey(event)) return;
       if (!shell.guestActive() && options.onKey?.(event) === true) return;
@@ -299,7 +300,7 @@ export function createRoot(options: RootOptions = {}): Root {
         protocol: PROTOCOL,
         name,
         title: currentTitle,
-        cwd: process.cwd(),
+        cwd: options.cwd ?? process.cwd(),
         startedAt: Date.now(),
       },
       env,

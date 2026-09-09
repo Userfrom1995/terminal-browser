@@ -27,7 +27,7 @@ function openPage(request: Extract<Request, { cmd: "open" }>, onClosed: (code: n
     tty: request.tty,
     sessionEnv: request.env,
     onKey(event) {
-      if (event.kind === "press" && event.mods.ctrl && event.key === "q") {
+      if (event.kind === "press" && event.mods.ctrl && event.key === "c") {
         root.stop();
         return true;
       }
