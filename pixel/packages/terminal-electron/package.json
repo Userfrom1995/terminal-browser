@@ -22,6 +22,10 @@
       "types": "./dist/preload/index.d.ts",
       "default": "./dist/preload/index.js"
     },
+    "./electron": {
+      "types": "./dist/electron/index.d.ts",
+      "default": "./dist/electron/index.js"
+    },
     "./terminal": {
       "types": "./dist/terminal/index.d.ts",
       "default": "./dist/terminal/index.js"

@@ -600,7 +600,12 @@ impl PixelEngine {
         self.stop.store(true, Ordering::Relaxed);
         self.waker.wake();
         if let Some(thread) = self.thread.take() {
-            let _ = thread.join();
+            let (done_tx, done_rx) = channel();
+            std::thread::spawn(move || {
+                let _ = thread.join();
+                let _ = done_tx.send(());
+            });
+            let _ = done_rx.recv_timeout(std::time::Duration::from_secs(1));
         }
         self.engine = None;
     }

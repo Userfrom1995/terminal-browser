@@ -18,6 +18,8 @@ Thumbs.db
 
 node_modules/
 dist/
+__pycache__/
+*.pyc
 packages/native/*/pixel.node
 packages/native/*/native-scroll-helper
 .claude/worktrees/

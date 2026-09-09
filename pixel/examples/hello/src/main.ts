@@ -1,6 +1,7 @@
 import { createRoot } from "terminal-electron";
 
 const url = process.argv[2] ?? "https://github.com/zenbu-labs";
+const partition = process.argv[3] ?? process.env.HELLO_PARTITION;
 
 const root = createRoot({
   onKey(event) {
@@ -11,5 +12,5 @@ const root = createRoot({
   },
 });
 
-const page = root.loadURL(url);
+const page = root.loadURL(url, partition ? { partition } : undefined);
 page.onChange((state) => root.setTitle(state.title || state.url));

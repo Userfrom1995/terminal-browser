@@ -66,8 +66,6 @@ function logFile(appDir: string): string {
   return path.join(dir, `${path.basename(appDir)}.stderr.log`);
 }
 
-// The engine must open the tty itself: node marks inherited stdio non-blocking,
-// and a full pty buffer would then fail a frame write with EAGAIN.
 function ownTty(): string {
   try {
     const out = execFileSync("tty", { stdio: ["inherit", "pipe", "ignore"], encoding: "utf8" }).trim();
@@ -95,8 +93,6 @@ async function main(): Promise<number> {
   const entry = resolveEntry(own[0] ?? ".");
 
   const tty = process.env.TERMINAL_ELECTRON_TTY ?? ownTty();
-  // Another terminal-electron app already draws on this tty, so this one will
-  // join it as a guest and never touches the terminal itself.
   const owner = findOwner(tty);
   const announced = owner ? announceGuest(owner, appName(appDir(entry))) : null;
   if (!owner && !process.env.TERMINAL_ELECTRON_EMBED) {
@@ -141,6 +137,11 @@ async function main(): Promise<number> {
     try {
       child.kill(signal);
     } catch {}
+    setTimeout(() => {
+      try {
+        child.kill("SIGKILL");
+      } catch {}
+    }, 2000).unref();
   };
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(signal, forward(signal));
   const exited = await new Promise<number>((resolve) => {
@@ -150,8 +151,6 @@ async function main(): Promise<number> {
     });
     child.on("exit", (code, signal) => resolve(code ?? (signal ? 128 : 0)));
   });
-  // The app may have handed its pane to a guest. As long as some app owns this
-  // tty the shell must not get its prompt back, so this process stands in.
   await waitForOwners(tty);
   return exited;
 }

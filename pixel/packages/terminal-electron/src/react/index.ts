@@ -280,16 +280,31 @@ export function createRoot(options: RootOptions = {}): PixelRoot {
       ? new Bridge(options.tty, options.wrapper, options.sessionEnv, options.host)
       : getBridge(options.wrapper);
   const devtoolsEnabled = options.devtools !== false && bridge === getBridge();
-  if (devtoolsEnabled) {
+  let devtoolsInstalled = false;
+  const enableDevtools = () => {
+    if (devtoolsInstalled || bridge !== getBridge()) return;
+    devtoolsInstalled = true;
     installConsoleCapture();
     installFiberHook();
-  }
+    reconciler.injectIntoDevTools({
+      bundleType: 0,
+      version: "18.3.1",
+      rendererPackageName: "pixel-react",
+    });
+    bridge.onFlush = (sample) => {
+      recordSpan({
+        name: `ops flush (${sample.ops} ops)`,
+        start: sample.start,
+        dur: sample.dur,
+        depth: 0,
+        lane: "bridge",
+        arg: sample.seq,
+      });
+    };
+  };
   const info = JSON.parse(bridge.engine.info()) as EngineInfo;
   applyColors(info.colors);
   bridge.engine.setKeyEventTypes(!!options.keyEventTypes);
-  // what is this?
-  // Any commit can move a node whose own component did not re-render, so the
-  // rects are re-asked for after every commit rather than per component.
   if (options.onLayout) {
     bridge.afterCommit = (view) => {
       if (view !== APP_VIEW) return;
@@ -311,23 +326,7 @@ export function createRoot(options: RootOptions = {}): PixelRoot {
     },
     null
   );
-  if (devtoolsEnabled) {
-    reconciler.injectIntoDevTools({
-      bundleType: 0,
-      version: "18.3.1",
-      rendererPackageName: "pixel-react",
-    });
-    bridge.onFlush = (sample) => {
-      recordSpan({
-        name: `ops flush (${sample.ops} ops)`,
-        start: sample.start,
-        dur: sample.dur,
-        depth: 0,
-        lane: "bridge",
-        arg: sample.seq,
-      });
-    };
-  }
+  if (devtoolsEnabled) enableDevtools();
 
   const fontIds = new Map<string, number>();
   const fontRequests = new Map<
@@ -514,6 +513,10 @@ export function createRoot(options: RootOptions = {}): PixelRoot {
       case "focus":
         options.onFocus?.(!!event.focused);
         break;
+      case "devtools":
+        enableDevtools();
+        toggleDevtools();
+        break;
       case "inspect":
         if (devtoolsEnabled && view === APP_VIEW && event.node != null) {
           openDevtools(event.node);
@@ -695,6 +698,7 @@ export function createRoot(options: RootOptions = {}): PixelRoot {
       process.off("exit", restore);
     },
     openDevtools() {
+      enableDevtools();
       openDevtools();
     },
     closeDevtools() {

@@ -9,15 +9,13 @@ use crate::terminal::{
     TerminalColors, WindowSize,
 };
 
-const HELLO_TIMEOUT: Duration = Duration::from_secs(5);
+const INIT_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub(crate) struct HostState {
     pub(crate) size: WindowSize,
     pub(crate) colors: TerminalColors,
     pub(crate) focused: bool,
-    // The owner hung up; nothing more will arrive and frames have nowhere to go.
     pub(crate) closed: bool,
-    // Only a host that has us draw straight into its terminal sends these.
     pub(crate) cell: Option<(u32, u32)>,
     pub(crate) image_id: Option<u32>,
     pub(crate) transport: Option<String>,
@@ -26,35 +24,34 @@ pub(crate) struct HostState {
 pub(crate) struct Joined {
     pub(crate) stream: UnixStream,
     pub(crate) state: HostState,
-    // Lines the owner sent right behind hello; they belong to the event queue.
     pub(crate) pending: Vec<u8>,
 }
 
 pub(crate) fn join(socket: &str, pane: &str, name: &str) -> io::Result<Joined> {
     let stream = UnixStream::connect(socket)?;
-    stream.set_read_timeout(Some(HELLO_TIMEOUT))?;
+    stream.set_read_timeout(Some(INIT_TIMEOUT))?;
     let mut reader = BufReader::new(stream);
-    let hello = json!({
+    let announce = json!({
         "type": "join",
         "pane": pane,
         "name": name,
         "pid": std::process::id(),
     });
-    send(reader.get_mut(), &hello)?;
+    send(reader.get_mut(), &announce)?;
     let mut line = String::new();
     if reader.read_line(&mut line)? == 0 {
-        return Err(io::Error::other("host closed the connection before hello"));
+        return Err(io::Error::other("host closed the connection before the init reply"));
     }
     let value: Value = serde_json::from_str(&line)
-        .map_err(|error| io::Error::other(format!("host hello is not json: {error}")))?;
-    if value["type"] != "hello" {
+        .map_err(|error| io::Error::other(format!("host init reply is not json: {error}")))?;
+    if value["type"] != "init" {
         return Err(io::Error::other(format!(
-            "host answered {} instead of hello",
+            "host answered {} instead of init",
             value["type"]
         )));
     }
     let state = HostState {
-        size: size_from(&value).ok_or_else(|| io::Error::other("host hello has no size"))?,
+        size: size_from(&value).ok_or_else(|| io::Error::other("host init reply has no size"))?,
         colors: colors_from(&value["colors"]),
         focused: value["focused"].as_bool().unwrap_or(true),
         closed: false,
@@ -66,8 +63,6 @@ pub(crate) fn join(socket: &str, pane: &str, name: &str) -> io::Result<Joined> {
     };
     let pending = reader.buffer().to_vec();
     let stream = reader.into_inner();
-    // Reads only happen after poll says the socket is readable, so a leftover
-    // timeout cannot fire; clearing it fails on macOS once the peer has hung up.
     let _ = stream.set_read_timeout(None);
     Ok(Joined {
         stream,
@@ -127,6 +122,7 @@ pub(crate) fn parse_line(line: &[u8], state: &mut HostState) -> Option<Event> {
             state.colors = colors_from(&value["colors"]);
             Some(Event::Colors(state.colors))
         }
+        "devtools" => Some(Event::Devtools),
         "adopt" => Some(Event::Handoff(Handoff::Adopt {
             tty: value["tty"].as_str()?.to_string(),
         })),
@@ -403,9 +399,9 @@ mod tests {
                         }
                     });
                 } else if opening.contains("\"join\"") {
-                    let hello = json!({ "type": "hello", "cols": 40, "rows": 10, "width": 400,
+                    let init = json!({ "type": "init", "cols": 40, "rows": 10, "width": 400,
                         "height": 200, "colors": { "background": [0, 0, 0, 255] }, "focused": true });
-                    send(reader.get_mut(), &hello).unwrap();
+                    send(reader.get_mut(), &init).unwrap();
                     let key = json!({ "type": "key", "key": "enter", "kind": "press", "mods": {} });
                     send(reader.get_mut(), &key).unwrap();
                     send(reader.get_mut(), &json!({ "type": "size", "cols": 20, "rows": 5, "width": 200, "height": 100 })).unwrap();
@@ -491,7 +487,7 @@ mod tests {
     }
 
     #[test]
-    fn join_reads_the_hello_and_hands_back_a_blocking_stream() {
+    fn join_reads_the_init_reply_and_hands_back_a_blocking_stream() {
         let dir = std::env::temp_dir().join(format!("pixel-hosted-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
@@ -502,11 +498,11 @@ mod tests {
             let mut reader = BufReader::new(stream);
             let mut join = String::new();
             reader.read_line(&mut join).unwrap();
-            let hello = json!({
-                "type": "hello", "cols": 40, "rows": 10, "width": 400, "height": 200,
+            let init = json!({
+                "type": "init", "cols": 40, "rows": 10, "width": 400, "height": 200,
                 "colors": { "foreground": [255, 255, 255, 255] }, "focused": false
             });
-            send(reader.get_mut(), &hello).unwrap();
+            send(reader.get_mut(), &init).unwrap();
             join
         });
         let Joined { state, .. } = join(&socket.to_string_lossy(), "pane-1", "hello").unwrap();

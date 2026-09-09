@@ -170,6 +170,7 @@ pub enum EngineEvent {
     Colors {
         colors: TerminalColors,
     },
+    Devtools,
     Inspect {
         view: usize,
         node: NodeId,
@@ -863,10 +864,7 @@ impl Engine {
         self.push_resizes(resized);
         Ok(())
     }
-    // what
 
-    // Moves the whole engine onto another terminal or owner: everything laid out
-    // stays, only where pixels go and events come from changes.
     pub fn retarget(&mut self, target: Retarget) -> io::Result<()> {
         self.term.retarget(target, self.session_env.clone())?;
         self.native = if self.term.is_hosted() && !self.term.is_embedded() {
@@ -973,7 +971,12 @@ impl Engine {
                 }
                 out.push(EngineEvent::Focus { focused });
             }
-            Event::WindowSize(ws) => self.apply_window(&ws)?,
+            Event::WindowSize(ws) => {
+                self.apply_window(&ws)?;
+                if self.term.is_embedded() {
+                    self.comp.dirty = true;
+                }
+            }
             Event::Mouse(mouse) => self.handle_mouse(mouse, out)?,
             Event::ClipboardData { items, ok } => {
                 self.clipboard
@@ -981,6 +984,7 @@ impl Engine {
             }
             Event::ColorSchemeChanged => self.schedule_color_request(COLOR_SETTLE_DELAY),
             Event::Colors(colors) => self.apply_colors(colors, out),
+            Event::Devtools => out.push(EngineEvent::Devtools),
         }
         self.emit_selection_change(out);
         Ok(())

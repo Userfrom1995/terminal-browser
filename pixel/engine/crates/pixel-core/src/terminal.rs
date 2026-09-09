@@ -30,6 +30,7 @@ pub enum Event {
     },
     ColorSchemeChanged,
     Colors(TerminalColors),
+    Devtools,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -234,15 +235,10 @@ enum TtyHandle {
         stdout: io::Stdout,
     },
     File(std::fs::File),
-    // A guest of another terminal-electron process: events arrive on the
-    // socket and every escape sequence we would have written is dropped.
     Hosted {
         stream: std::os::unix::net::UnixStream,
         sink: io::Sink,
     },
-    // A guest of a program that is not terminal-electron: events still arrive on
-    // the socket, but frames go to the terminal as kitty virtual placements the
-    // host lays out with placeholder cells.
     Embedded {
         stream: std::os::unix::net::UnixStream,
         tty: std::fs::File,
@@ -290,6 +286,7 @@ pub struct Terminal {
     wrapper: Wrapper,
     image_id: u32,
     placeholders: Option<(u32, u32)>,
+    placed_grid: Option<(u32, u32)>,
     wake_rx: Option<rustix::fd::OwnedFd>,
     waker: Option<Waker>,
     resize_slot: Option<usize>,
@@ -455,8 +452,6 @@ impl Terminal {
         matches!(self.io, TtyHandle::Embedded { .. })
     }
 
-    // Swaps what this terminal draws to and reads from, keeping the waker so the
-    // engine's existing handles still wake the new backend.
     pub fn retarget(&mut self, target: Retarget, env: SessionEnv) -> io::Result<()> {
         let mut fresh = match target {
             Retarget::Tty { path, wrapper } => Terminal::open(&path, wrapper, env)
@@ -535,6 +530,7 @@ impl Terminal {
             wrapper,
             image_id: frame_image_id(wrapper.relayed()),
             placeholders: None,
+            placed_grid: None,
             wake_rx: None,
             waker: None,
             resize_slot: None,
@@ -826,8 +822,9 @@ impl Terminal {
         self.last_frame_size = Some((canvas.width, canvas.height));
         let (cols, rows) = self.grid_for(canvas);
         let placement = Placement::Cells { cols, rows };
+        let grid_changed = self.placed_grid.is_some_and(|grid| grid != (cols, rows));
         let mut frame = Vec::new();
-        if shrank {
+        if shrank || grid_changed {
             frame.extend_from_slice(&crate::kitty::kitty_delete_one(self.image_id));
         }
         if let Some(medium) = match self.transport {
@@ -860,6 +857,7 @@ impl Terminal {
         }
         self.io.out().write_all(&frame)?;
         self.io.out().flush()?;
+        self.placed_grid = Some((cols, rows));
         if self.placeholders != Some((cols, rows)) {
             self.placeholders = Some((cols, rows));
             self.host_send(crate::hosted::placed(self.image_id, cols, rows))?;
@@ -878,6 +876,7 @@ impl Terminal {
         )
     }
 
+    // dead code fix me why do you exist
     pub fn read_event(&mut self) -> io::Result<Event> {
         match self.poll_event(None)? {
             Some(event) => Ok(event),
@@ -887,6 +886,7 @@ impl Terminal {
 
     pub fn poll_event(&mut self, timeout: Option<Duration>) -> io::Result<Option<Event>> {
         if self.hosted.is_some() {
+       
             return self.poll_host_event(timeout);
         }
         let deadline = timeout.map(|t| Instant::now() + t);
@@ -983,8 +983,6 @@ impl Terminal {
                 if let Some(event) = crate::hosted::parse_line(&line, state) {
                     match event {
                         Event::Focus(focused) => self.focused = focused,
-                        // A new size means the host redrew; it needs to hear where
-                        // the image sits again, and a new cell size if it sent one.
                         Event::WindowSize(_) => {
                             if state.cell.is_some() {
                                 self.cell = state.cell;
@@ -1157,6 +1155,10 @@ impl Terminal {
 
     pub fn cell_size(&mut self) -> io::Result<Option<(u32, u32)>> {
         if self.cell.is_some() {
+            return Ok(self.cell);
+        }
+        if let Some(state) = &self.hosted {
+            self.cell = state.cell.or_else(|| state.size.cell_size());
             return Ok(self.cell);
         }
         if self.wrapper.relayed() {

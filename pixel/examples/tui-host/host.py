@@ -1,24 +1,5 @@
 #!/usr/bin/env python3
-"""[placeholder copy: A plain terminal program, no terminal-electron inside it,
-that hosts a terminal-electron app in part of its screen.
 
-The app is started with TERMINAL_ELECTRON_EMBED pointing at a unix socket this
-program listens on. Over that socket, newline-delimited JSON:
-
-  app -> host   {"type":"join","pane":..,"name":..,"pid":..}
-  host -> app   {"type":"hello","cols":..,"rows":..,"width":..,"height":..,
-                 "cell":[w,h],"imageId":..,"transport":"inline"|"file"|"shm",
-                 "focused":true,"colors":{..}}        colors is optional
-  host -> app   size, key, mouse, paste, focus, colors  (what a tty would have carried)
-  app -> host   {"type":"placed","imageId":..,"cols":..,"rows":..}
-                title, pointer, clipboard
-
-The app draws itself straight into the terminal as a kitty virtual placement;
-this program decides where it shows by printing placeholder cells there. The
-app never reads the terminal and never asks it anything, so this program is
-the only reader of its own input and only ever sees its own keys, mouse
-reports and replies.]
-"""
 import fcntl
 import json
 import os
@@ -154,19 +135,6 @@ class Host:
     def draw_sidebar(self):
         rows, cols, _, _ = winsize()
         lines = [
-            " tui-host (python)",
-            "",
-            " a plain program hosting a",
-            " terminal-electron app on",
-            " the right, as an image it",
-            " places with placeholder",
-            " cells.",
-            "",
-            f" app: {self.title[:SIDEBAR - 6]}",
-            "",
-            " keys and clicks in the",
-            " right pane go to the app.",
-            "",
             " ctrl+q  quit",
         ]
         for r in range(rows):
@@ -225,11 +193,11 @@ class Host:
             return
         kind = message.get("type")
         if kind == "join":
-            hello = self.size_message("hello")
-            hello.update({"cell": list(self.cell), "imageId": IMAGE_ID, "transport": self.transport, "focused": True})
+            init = self.size_message("init")
+            init.update({"cell": list(self.cell), "imageId": IMAGE_ID, "transport": self.transport, "focused": True})
             if self.colors:
-                hello["colors"] = self.colors
-            self.send(hello)
+                init["colors"] = self.colors
+            self.send(init)
         elif kind == "placed":
             self.grid = message
             self.print_placeholders()
@@ -354,7 +322,8 @@ class Host:
         log = open(os.path.join(HERE, "app.stderr.log"), "ab")
         self.child = subprocess.Popen(COMMAND, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=log)
         resized = [False]
-        signal.signal(signal.SIGWINCH, lambda *_: resized.__setitem__(0, True))
+        # signal.signal(signal.SIGWINCH, lambda *_: resized.__setitem__(0, True))
+        signal.signal(signal.SIGWINCH, lambda *args: on_resize(resized, args))
         try:
             while True:
                 watch = [self.fd, server] + ([self.conn] if self.conn else [])
@@ -395,6 +364,10 @@ class Host:
             except OSError:
                 pass
 
+
+
+def on_resize(resized, args):
+    resized.__setitem__(0, True)
 
 if __name__ == "__main__":
     Host().run()

@@ -133,6 +133,7 @@ root.render(
         rows={[
           [<InlineCode key="a">terminal-electron</InlineCode>, "What your main process imports: createRoot with loadURL, and for layouts of your own WebView, DevTools and the components."],
           [<InlineCode key="b">terminal-electron/preload</InlineCode>, "Types for the small API pages can use to read the terminal's colours or ask the app to quit."],
+          [<InlineCode key="e">terminal-electron/electron</InlineCode>, "[placeholder copy: Electron's own API (app, ipcMain, and the rest) for your main process, so you never import a bare \"electron\". Sandboxed preload scripts still import \"electron\" directly.]"],
           [<InlineCode key="c">terminal-electron/terminal</InlineCode>, "Helpers for detecting the terminal, opening panes and finding running apps. Plain Node, usable from your own command line tools."],
           [<InlineCode key="d">terminal-electron</InlineCode>, "The launcher command."],
         ]}

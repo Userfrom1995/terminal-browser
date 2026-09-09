@@ -176,7 +176,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
       devtoolsEnabled: false,
       externalDevtools: false,
       externalDevtoolsAction: null,
-      toggleDevtools: () => {},
+      toggleDevtools: () => { },
       handleKey: () => false,
     }),
     [],
@@ -230,7 +230,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
     let hostName = "";
     try {
       hostName = new URL(top.state.url).host;
-    } catch {}
+    } catch { }
     return {
       title: top.state.title,
       host: hostName,
@@ -398,6 +398,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
     }
     if (devtoolsEnabled) {
       items.push({ id: "inspect", label: "inspect", enabled: true, shortcut: "f12" });
+      items.push({ id: "engine-devtools", label: "terminal-electron devtools", enabled: true, shortcut: "" });
     }
     const pageRect = page ?? { x: 0, y: 0 };
     setMenu({
@@ -431,6 +432,8 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
         return host.navigate(current.linkURL);
       case "copy-link":
         return registry.root.setClipboard(current.linkURL);
+      case "engine-devtools":
+        return registry.root.openDevtools();
       case "inspect":
         pendingInspect.current = { x: current.pageX, y: current.pageY };
         if (host.devtools) {
@@ -557,7 +560,10 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
             background: theme.bg,
           }}
           onPointer={(event: PointerEvent) => {
-            if (menuRef.current) setMenu(null);
+            if (menuRef.current) {
+              if (event.kind === "down") setMenu(null);
+              if (event.kind !== "up") return;
+            }
             registry.focus(entry);
             hostRef.current?.pointer(event);
             propsRef.current.onPointer?.(event);

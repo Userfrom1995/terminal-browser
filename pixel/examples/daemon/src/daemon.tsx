@@ -1,11 +1,8 @@
-// Runs inside electron with no terminal of its own. Every connection that asks
-// to open a page gets its own root on the terminal named in the request, so
-// one Chromium serves as many panes as there are shells asking.
 import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
 
-import { app } from "electron";
+import { app } from "terminal-electron/electron";
 import { createRoot, WebView } from "terminal-electron";
 import type { Root } from "terminal-electron";
 
@@ -96,8 +93,6 @@ const server = net.createServer((connection) => {
     }),
   );
   connection.on("error", () => {});
-  // The shell that asked for this page is gone (closed pane, killed cli), so
-  // the page goes with it.
   connection.on("close", () => root?.stop());
 });
 
