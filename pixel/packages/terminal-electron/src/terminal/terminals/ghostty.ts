@@ -3,15 +3,11 @@ import os from "node:os";
 import path from "node:path";
 
 import { appleScript } from "../applescript";
+import { GHOSTTY_SCRIPT } from "./ghostty-script";
 import { panePixels } from "../graphics";
 import { setPaneWorkingDirectory, shellQuote, sleep } from "../shared";
 import type { Detect, Direction, ListPanesOptions, Pane, PaneContext, PaneDetails } from "../terminal";
 
-let script: string | null = null;
-function ghosttyScript(): string {
-  script ??= fs.readFileSync(path.join(__dirname, "ghostty.jxa"), "utf8");
-  return script;
-}
 
 const DIRECTION_CODES: Record<Direction, string> = {
   right: "GSrt",
@@ -115,7 +111,7 @@ export const ghostty: Detect = (env, run) => {
   }
 
   async function ghosttyCommand(command: string, args: string[], tty: string | null = null): Promise<string> {
-    return osascript(ghosttyScript(), [String(await ownerPid(tty)), command, ...args]);
+    return osascript(GHOSTTY_SCRIPT, [String(await ownerPid(tty)), command, ...args]);
   }
 
   let scale: number | null = null;

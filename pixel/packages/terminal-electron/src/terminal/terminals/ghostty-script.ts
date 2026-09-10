@@ -1,4 +1,4 @@
-ObjC.import("Foundation");
+export const GHOSTTY_SCRIPT = String.raw`ObjC.import("Foundation");
 
 const Descriptor = $.NSAppleEventDescriptor;
 const WAIT_FOR_REPLY = 3;
@@ -173,3 +173,4 @@ function run(argv) {
   }
   throw new Error("unknown command " + command);
 }
+`;
