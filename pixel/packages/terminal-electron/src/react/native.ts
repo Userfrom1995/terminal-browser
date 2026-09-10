@@ -138,8 +138,12 @@ function loadBinding(): unknown {
   try {
     return require(`${NATIVE_PACKAGE}/pixel.node`);
   } catch (error) {
+    const target = `${process.platform}-${process.arch} (${NATIVE_PACKAGE})`;
+    const message = error instanceof Error ? error.message : String(error);
     throw new Error(
-      `[placeholder copy: terminal-electron has no native build for ${process.platform}-${process.arch} (${NATIVE_PACKAGE}): ${error instanceof Error ? error.message : String(error)}]`,
+      (error as NodeJS.ErrnoException).code === "MODULE_NOT_FOUND"
+        ? `[placeholder copy: terminal-electron has no native build for ${target}: ${message}]`
+        : `[placeholder copy: terminal-electron's native build for ${target} is installed but failed to load: ${message}]`,
     );
   }
 }

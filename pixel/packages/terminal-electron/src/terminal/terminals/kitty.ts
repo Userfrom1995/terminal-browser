@@ -80,10 +80,16 @@ interface KittyOsWindow {
 
 function findKitten(env: NodeJS.ProcessEnv): string | null {
   const pathDirs = (env.PATH ?? "").split(path.delimiter).filter(Boolean);
+  const appBundles =
+    process.platform === "darwin"
+      ? [
+          "/Applications/kitty.app/Contents/MacOS/kitten",
+          path.join(env.HOME ?? "/", "Applications/kitty.app/Contents/MacOS/kitten"),
+        ]
+      : [];
   const candidates = [
     ...pathDirs.map((dir) => path.join(dir, "kitten")),
-    "/Applications/kitty.app/Contents/MacOS/kitten",
-    path.join(env.HOME ?? "/", "Applications/kitty.app/Contents/MacOS/kitten"),
+    ...appBundles,
     ...pathDirs.map((dir) => path.join(dir, "kitty")),
   ];
   return (
