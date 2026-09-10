@@ -320,11 +320,9 @@ test("ghostty refuses to guess between instances it cannot connect to this shell
 
 test("ghostty splits through the owning instance with the direction code", onMac, async () => {
   const { run, commands } = recorder({
-    "ps -axo pid=,ppid=,tty=,command=": processTable([
-      [process.pid, process.ppid, "ttys001", "node test"],
-      [process.ppid, 1, "??", GHOSTTY_BIN],
-    ]),
-    [`osascript -l JavaScript - ${process.ppid} split AAAA GSrt ${process.cwd()} terminal-electron open\n`]: "BBBB",
+    [`ps -o pid=,ppid=,command= -p ${process.pid}`]: `${process.pid} ${process.ppid} node test\n`,
+    [`ps -o pid=,ppid=,command= -p ${process.ppid}`]: `${process.ppid} 1 ${GHOSTTY_BIN}\n`,
+    [`osascript -l JavaScript - ${process.ppid} split AAAA GSrt ${process.cwd()} /bin/sh -c 'terminal-electron open; exit $?'`]: "BBBB",
   });
   await detect(GHOSTTY_ENV, run).split({
     from: { id: "AAAA", tab: "w1:t1" },
@@ -334,8 +332,9 @@ test("ghostty splits through the owning instance with the direction code", onMac
     tty: null,
   });
   assert.deepEqual(commands, [
-    "ps -axo pid=,ppid=,tty=,command=",
-    `osascript -l JavaScript - ${process.ppid} split AAAA GSrt ${process.cwd()} terminal-electron open\n`,
+    `ps -o pid=,ppid=,command= -p ${process.pid}`,
+    `ps -o pid=,ppid=,command= -p ${process.ppid}`,
+    `osascript -l JavaScript - ${process.ppid} split AAAA GSrt ${process.cwd()} /bin/sh -c 'terminal-electron open; exit $?'`,
   ]);
 });
 
@@ -349,7 +348,7 @@ test("ghostty asks the owning instance for a split's neighbor by window and tab"
   });
   const found = await detect(GHOSTTY_ENV, run).neighbor({ id: "AAAA", tab: "w1:t1" }, "right");
   assert.deepEqual(found, { id: "BBBB", tab: "w1:t1" });
-  assert.equal(commands[1], `osascript -l JavaScript - ${process.ppid} neighbor w1 t1 AAAA right`);
+  assert.equal(commands.at(-1), `osascript -l JavaScript - ${process.ppid} neighbor w1 t1 AAAA right`);
 });
 
 test("ghostty lists panes through the caller's tty when the process has no ghostty ancestor", onMac, async () => {

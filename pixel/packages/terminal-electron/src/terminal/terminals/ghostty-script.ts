@@ -10,6 +10,7 @@ function code(text) {
 const typeCode = (text) => Descriptor.descriptorWithTypeCode(code(text));
 const enumCode = (text) => Descriptor.descriptorWithEnumCode(code(text));
 const string = (text) => Descriptor.descriptorWithString(text);
+const boolean = (value) => Descriptor.descriptorWithBoolean(value);
 const nothing = Descriptor.nullDescriptor;
 // the "every element" ordinal is the four-char code 'all ' stored in native (little-endian) byte order
 const everyOrdinal = Descriptor.descriptorWithDescriptorTypeData(
@@ -105,9 +106,8 @@ function list(pid) {
 }
 
 // Ghostty does not report where splits sit, but goto_split says whether it could
-// move and the tab says where focus landed. Focus moves a moment after the action
-// returns, so both the move and the restore are waited for; the tab is left as
-// it was found.
+// move and the tab says where focus landed. Focus moves a moment after each
+// action returns, so every move is waited for; focus is put back where it was.
 function neighbor(pid, windowId, tabId, id, direction) {
   const inTab = tab(windowId, tabId);
   const focused = () => get(pid, "ID  ", property("GTfT", inTab));
@@ -119,16 +119,15 @@ function neighbor(pid, windowId, tabId, id, direction) {
     }
     return focused();
   };
+  const focus = (target) => {
+    send(pid, "Ghst", "Fcus", { "----": terminal(target) });
+    settle((now) => now === target);
+  };
   const startId = focused();
+  if (startId !== id) focus(id);
   const moved = performAction(pid, "goto_split:" + direction, terminal(id)) === true;
-  let endId = startId;
-  if (moved) {
-    endId = settle((now) => now !== startId);
-    if (endId !== startId) {
-      performAction(pid, "goto_split:previous", property("GTfT", inTab));
-      settle((now) => now === startId);
-    }
-  }
+  const endId = moved ? settle((now) => now !== id) : id;
+  if (focused() !== startId) focus(startId);
   return moved && endId !== id ? endId : "";
 }
 
@@ -149,10 +148,11 @@ function run(argv) {
       return list(target);
     case "split":
       return orNotFound(() => {
-        const [id, direction, directory, input] = rest;
+        const [id, direction, directory, command] = rest;
         const configuration = Descriptor.recordDescriptor;
         configuration.setDescriptorForKeyword(string(directory), code("GScD"));
-        configuration.setDescriptorForKeyword(string(input), code("GScI"));
+        configuration.setDescriptorForKeyword(string(command), code("GScC"));
+        configuration.setDescriptorForKeyword(boolean(false), code("GScW"));
         const opened = send(target, "Ghst", "Splt", { "----": terminal(id), GSpd: enumCode(direction), GSpS: configuration });
         return get(target, "ID  ", opened);
       });

@@ -85,7 +85,20 @@ export const ghostty: Detect = (env, run) => {
     return owner;
   }
 
+  async function ghosttyAncestor(): Promise<number | null> {
+    for (let pid = process.pid, hops = 0; pid > 1 && hops < 64; hops++) {
+      const line = await run("ps", ["-o", "pid=,ppid=,command=", "-p", String(pid)]).catch(() => "");
+      const parts = line.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/);
+      if (!parts) return null;
+      if (GHOSTTY_BINARY.test(parts[3])) return pid;
+      pid = Number(parts[2]);
+    }
+    return null;
+  }
+
   async function findOwner(tty: string | null): Promise<number> {
+    const ancestor = await ghosttyAncestor();
+    if (ancestor !== null) return ancestor;
     const processes = new Map<number, Process>();
     for (const line of (await run("ps", ["-axo", "pid=,ppid=,tty=,command="])).split("\n")) {
       const parts = line.trim().match(/^(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/);
@@ -320,12 +333,10 @@ export const ghostty: Detect = (env, run) => {
     },
     async split({ from, direction, command, size }) {
       const startDir = directories.get(from.id) ?? process.cwd();
-      const opened = await ghosttyCommand("split", [
-        from.id,
-        DIRECTION_CODES[direction],
-        startDir,
-        `${shellQuote(command)}\n`,
-      ]);
+      // Ghostty execs the command from login, and Electron logs a code-signing
+      // error when its parent is login; a shell in between keeps the pane quiet
+      const wrapped = shellQuote(["/bin/sh", "-c", `${shellQuote(command)}; exit $?`]);
+      const opened = await ghosttyCommand("split", [from.id, DIRECTION_CODES[direction], startDir, wrapped]);
       if (!opened || opened === "not-found") {
         throw new Error("this pane went away before we could split it");
       }
