@@ -6,7 +6,7 @@ import { cursorShapeFor } from "./cursor";
 import { frameRate } from "./frame-rate";
 import { PageInput } from "./input";
 import { offscreenPreferences } from "./offscreen";
-import { BitmapPresenter, presentPaint, shmFrameOf } from "./paint";
+import { BitmapPresenter, presentPaint } from "./paint";
 import { cssSize } from "./types";
 import type { SurfaceLayout } from "./types";
 
@@ -81,7 +81,7 @@ export class DevtoolsWindow {
     screen.on("display-removed", this.onDisplayChange);
     screen.on("display-metrics-changed", this.onDisplayChange);
     this.window.webContents.on("paint", (event, dirtyRect, image) => {
-      const shmFrame = shmFrameOf(event);
+      const shmFrame = event.softwareFrame;
       if (!this.visible) {
         event.texture?.release();
         shmFrame?.release();

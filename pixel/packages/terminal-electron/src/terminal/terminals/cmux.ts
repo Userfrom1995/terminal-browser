@@ -80,9 +80,7 @@ export const cmux: Detect = (env, run) => {
     return found;
   }
 
-  // cmux places panes in points inside the workspace; the socket reports each
-  // pane's frame, and surfaces (tabs) live inside panes. A neighbor is the
-  // pane touching the given side, answered as its selected surface.
+
   async function neighbor(from: Pane, direction: "right" | "left" | "down" | "up"): Promise<Pane | null> {
     const workspace = from.tab || env.CMUX_WORKSPACE_ID;
     const rows: CmuxPaneRow[] =

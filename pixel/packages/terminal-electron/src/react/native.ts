@@ -142,8 +142,8 @@ function loadBinding(): unknown {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(
       (error as NodeJS.ErrnoException).code === "MODULE_NOT_FOUND"
-        ? `[placeholder copy: terminal-electron has no native build for ${target}: ${message}]`
-        : `[placeholder copy: terminal-electron's native build for ${target} is installed but failed to load: ${message}]`,
+        ? `no native build for ${target}: ${message}]`
+        : `failed to load: ${message}]`,
     );
   }
 }

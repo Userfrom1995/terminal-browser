@@ -75,7 +75,6 @@ export interface Style {
   hoverColor?: Color;
   scrollbar?: ScrollbarStyle;
   wrap?: boolean;
-  /** [placeholder copy: When wrap is off, cut text that is wider than its box and end it with an ellipsis instead of clipping it mid-glyph.] */
   ellipsis?: boolean;
   selectable?: boolean;
   selectionColor?: Color;

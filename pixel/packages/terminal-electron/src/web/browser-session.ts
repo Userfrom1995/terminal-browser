@@ -25,8 +25,7 @@ const configured = new WeakSet<Session>();
 const proxied = new WeakSet<Session>();
 let webrtcGuard = false;
 
-// A page behind a proxy must not reach the network around it, which WebRTC
-// would otherwise do over plain UDP.
+
 export function routeThroughProxy(target: Session, rules: string): Promise<void> {
   proxied.add(target);
   if (!webrtcGuard) {

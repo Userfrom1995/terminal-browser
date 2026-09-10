@@ -154,9 +154,7 @@ export function requestLayout() {
   b.flush();
 }
 
-// A heartbeat that misses its slot means the node event loop was blocked by
-// synchronous work; the missed window becomes a span so profile gaps where
-// "nothing ran" get an explanation.
+
 const STALL_TICK_MS = 25;
 const STALL_REPORT_MS = 60;
 let stallTimer: ReturnType<typeof setInterval> | null = null;

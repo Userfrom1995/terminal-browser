@@ -9,7 +9,7 @@ import type { DevtoolsAction } from "./devtools";
 import { frameRate } from "./frame-rate";
 import { PageInput } from "./input";
 import { offscreenPreferences } from "./offscreen";
-import { BitmapPresenter, presentPaint, shmFrameOf } from "./paint";
+import { BitmapPresenter, presentPaint } from "./paint";
 import { PopupWindow } from "./popup";
 import { prepareSession } from "./session";
 import { cssSize, initialWebViewState } from "./types";
@@ -167,7 +167,7 @@ export class PageHost {
     screen.on("display-removed", this.onDisplayChange);
     screen.on("display-metrics-changed", this.onDisplayChange);
     this.window.webContents.on("paint", (event, dirtyRect, image) => {
-      const shmFrame = shmFrameOf(event);
+      const shmFrame = event.softwareFrame;
       const size = event.texture
         ? {
             width: event.texture.textureInfo.codedSize.width,

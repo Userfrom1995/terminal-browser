@@ -7,9 +7,7 @@ import type { NodeHandle } from "./react";
 import type { ViewRegistry } from "./registry";
 import type { Rect } from "./devtools-layout";
 
-// The engine answers a queryLayout op with every node's rect. The root asks
-// after each commit and each terminal resize, so a node's rect stays current
-// without the engine having to know which nodes care.
+
 export function useNodeRect(node: RefObject<NodeHandle | null>, registry: ViewRegistry): Rect | null {
   const [rect, setRect] = useState<Rect | null>(null);
   // subscribed before the query below goes out, or the reply can land first and be missed

@@ -11,8 +11,7 @@ function isIco(data: Buffer): boolean {
   return data.length > 4 && data[0] === 0 && data[1] === 0 && data[2] === 1 && data[3] === 0;
 }
 
-// Fetches a page's icon through the page's own session, so cookies and proxies
-// apply, and keeps a 32px copy on disk keyed by the candidate urls.
+
 export class FaviconCache {
   constructor(private readonly dir: string = path.join(app.getPath("userData"), "favicons")) {}
 

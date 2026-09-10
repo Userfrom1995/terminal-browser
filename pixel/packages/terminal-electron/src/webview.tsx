@@ -46,43 +46,27 @@ import type { ZoomDirection } from "./web/zoom";
 export type { BrowserWindowOptions, DownloadProgress, OpenWindowDecision, OpenWindowPolicy, WebViewState };
 
 export interface WebViewProps {
-  /** [placeholder copy: The url to load. Use a real url; file: urls work too.] */
   src: string;
   style?: Style;
-  /** [placeholder copy: Path to a preload script. Shorthand for browserWindowOptions.webPreferences.preload.] */
   preload?: string;
-  /** [placeholder copy: Storage partition. Shorthand for browserWindowOptions.webPreferences.partition, made persistent unless it already starts with "persist:".] */
   partition?: string;
-  /** [placeholder copy: Lets the page read the clipboard.] */
   clipboardRead?: boolean;
-  /** [placeholder copy: Chromium proxy rules for this page's traffic, for example socks5://127.0.0.1:1080. A proxy applies to the whole storage partition, so give a proxied view its own partition.] */
   proxy?: string;
-  /** [placeholder copy: Electron BrowserWindow options, webPreferences included, passed to the offscreen window behind this view and its popups. Only what the view has to control is excluded: size, visibility, offscreen rendering, dialogs and background throttling.] */
   browserWindowOptions?: BrowserWindowOptions;
-  /** [placeholder copy: Focus the view as soon as it mounts. Defaults to true for the only WebView on screen.] */
   autoFocus?: boolean;
-  /** [placeholder copy: Enables the right click menu, the inspect shortcut and a devtools dock inside the view. Defaults to on unless NODE_ENV is "production". A dock side turns it on docked there.] */
   devtools?: boolean | DevtoolsDock;
-  /** [placeholder copy: Keeps the page alive but draws nothing and lets it idle, for views that are not on screen right now (a background tab).] */
   hidden?: boolean;
-  /** [placeholder copy: Keep showing the last frame, stretched, while the view changes size instead of clearing to the background until the page repaints. Defaults to true.] */
   keepFrame?: boolean;
-  /** [placeholder copy: The page's url, title, loading, history, find matches, zoom and favicon, whenever any of them change.] */
   onChange?(state: WebViewState): void;
-  /** [placeholder copy: Observes pointer events on the page after they are delivered to it.] */
   onPointer?(event: PointerEvent): void;
-  /** [placeholder copy: Replaces the default right click menu.] */
   onContextMenu?(params: Electron.ContextMenuParams): void;
-  /** [placeholder copy: What window.open and target=_blank do: "popup" draws a popup over the view, "navigate" loads the url in this view, "deny" ignores it. A function decides per request. By default scripted popups (disposition "new-window") become popups and links open in this view.] */
   onOpenWindow?: OpenWindowPolicy;
   onDownload?(progress: DownloadProgress): void;
 }
 
 export interface WebViewHandle {
   readonly webContents: Electron.WebContents;
-  /** [placeholder copy: The latest state the page reported.] */
   readonly state: WebViewState;
-  /** [placeholder copy: Called with the new state whenever it changes. Returns an unsubscribe function.] */
   onChange(listener: (state: WebViewState) => void): () => void;
   loadURL(url: string): void;
   focus(): void;
@@ -98,19 +82,14 @@ export interface WebViewHandle {
   openDevtools(): void;
   closeDevtools(): void;
   closePopup(): void;
-  /** [placeholder copy: Everything a screen recorder needs from this view.] */
   readonly recording: WebViewRecording;
 }
 
 export interface WebViewRecording {
-  /** [placeholder copy: Starts writing every frame the page paints into dir; stop() on the result ends it.] */
   start(dir: string): SurfaceCapture;
-  /** [placeholder copy: Called each time the page delivers a frame. Returns an unsubscribe function.] */
   onFrame(listener: () => void): () => void;
   frameSize(): { width: number; height: number } | null;
-  /** [placeholder copy: Keeps the page painting at full rate even while hidden.] */
   pinFrameRate(pinned: boolean): void;
-  /** [placeholder copy: Asks the page to repaint everything.] */
   invalidate(): void;
 }
 
@@ -130,7 +109,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
   const registry = useContext(RootContext);
   if (!registry) {
     throw new Error(
-      "[placeholder copy: <WebView> has to be rendered by a root from terminal-electron's createRoot()]",
+      "<WebView> has to be rendered by a root from terminal-electron's createRoot()",
     );
   }
   const colors = useRegistryColors(registry);

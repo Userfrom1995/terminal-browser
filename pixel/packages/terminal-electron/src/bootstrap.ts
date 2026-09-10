@@ -6,9 +6,7 @@ import { app } from "electron";
 
 import { debug } from "./debug";
 
-// Runs inside electron before the app's own entry: the switches the offscreen
-// renderer needs, log files, a debugging port, then the entry once electron is
-// ready so createRoot() can be called at the top level.
+
 
 const entry = process.argv[2];
 if (!entry) {

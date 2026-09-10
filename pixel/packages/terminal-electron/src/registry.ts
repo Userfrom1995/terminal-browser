@@ -28,8 +28,7 @@ export class ViewRegistry {
   readonly views = new Set<ViewEntry>();
   focused: ViewEntry | null = null;
   readonly resizeListeners = new Set<() => void>();
-  // Per root, because a process can host several roots on different terminals
-  // (terminal-browser's daemon does) and their layouts and colours must not mix.
+
   readonly layout: Store<LayoutSnapshot> = createStore<LayoutSnapshot>({
     rects: new Map(),
     stats: { frameMs: 0, fps: 0 },

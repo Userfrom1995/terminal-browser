@@ -7,7 +7,7 @@ import type { Detect, Pane, PaneDetails } from "../terminal";
 
 // todo: do this automatically
 const SETUP_HINT = [
-  "[placeholder copy: kitty has remote control switched off, and terminal-electron needs it to script this terminal.]",
+  "kitty has remote control switched off, which is required for this feature",
   "Add these two lines to kitty.conf (usually ~/.config/kitty/kitty.conf), then fully quit and reopen kitty:",
   "  allow_remote_control socket-only",
   "  listen_on unix:/tmp/kitty",
@@ -36,9 +36,7 @@ interface KittyTab {
   groups?: { id: number; windows: number[] }[];
 }
 
-// kitty reports the splits layout as a tree of pairs with a bias rather than
-// pane positions. Walking it with each pair's bias gives every pane a
-// rectangle on a fixed grid, which is all adjacency needs.
+
 const GRID = 10000;
 
 function pairRects(tab: KittyTab): PaneRect[] {

@@ -28,7 +28,6 @@ function graphicsReply(buffer: string): boolean | null {
   return rest.startsWith("OK");
 }
 
-/** Asks the terminal whether it can draw images. Only works on a real tty. */
 export function probeGraphics(terminal: Terminal | null): Promise<GraphicsSupport> {
   const stdin = process.stdin;
   if (!stdin.isTTY || !process.stdout.isTTY || !stdin.setRawMode) {
@@ -128,7 +127,7 @@ export function unsupportedGraphicsMessage(color = false): string {
   const sgr = (code: string, text: string) => (color ? `\x1b[${code}m${text}\x1b[0m` : text);
   return [
     "",
-    `  ${sgr("1", "[placeholder copy: This terminal cannot show images, which terminal-electron needs.]")}`,
+    `  ${sgr("1", "Unsupported terminal: this terminal cannot display graphics")}`,
     "",
     `  ${sgr("2", "We recommend Ghostty:")}`,
     `  ${sgr("4", "https://ghostty.org/download")}`,

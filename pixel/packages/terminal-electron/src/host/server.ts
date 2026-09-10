@@ -5,13 +5,6 @@ import path from "node:path";
 
 import { debug } from "../debug";
 import type { EngineKeyEvent, TerminalColors } from "../react";
-
-// The owner's side of the pane protocol. A guest opens three connections:
-// one asking about frames (pane.graphics.info), one streaming frame headers
-// (pane.graphics.stream), and one control connection (join) that carries what
-// a tty would have: size, input, focus, colours down; title, pointer,
-// clipboard up.
-
 export interface GuestFrame {
   path: string;
   width: number;
@@ -19,7 +12,7 @@ export interface GuestFrame {
   ack(): void;
 }
 
-export interface HelloPayload {
+export interface InitPayload {
   cols: number;
   rows: number;
   width: number;
@@ -49,8 +42,8 @@ export type GuestMessage =
     }
   | { type: "focus"; focused: boolean }
   | { type: "colors"; colors: TerminalColors }
-  | ({ type: "size" } & Pick<HelloPayload, "cols" | "rows" | "width" | "height">)
-  | ({ type: "hello" } & HelloPayload)
+  | ({ type: "size" } & Pick<InitPayload, "cols" | "rows" | "width" | "height">)
+  | ({ type: "init" } & InitPayload)
   | { type: "adopt"; tty: string }
   | { type: "rejoin"; socket: string };
 
@@ -63,7 +56,7 @@ export class Guest {
   onClose: (() => void) | null = null;
   private closed = false;
   private departed = false;
-  // Nothing may reach the guest before hello; its engine reads hello first.
+  // Nothing may reach the guest before init; its engine reads init first.
   private greeted = false;
   private queued: GuestMessage[] = [];
 
@@ -94,7 +87,7 @@ export class Guest {
       return;
     }
     if (!this.greeted) {
-      if (message.type !== "hello") {
+      if (message.type !== "init") {
         this.queued.push(message);
         return;
       }
@@ -152,8 +145,7 @@ export class Guest {
   }
 }
 
-// Frame files live under a per-process directory so a crashed owner's leftovers
-// can be swept by the next one.
+
 function frameDirectory(): string {
   const root = path.join(os.tmpdir(), "terminal-electron-frames");
   fs.mkdirSync(root, { recursive: true });

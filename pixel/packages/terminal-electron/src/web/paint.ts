@@ -1,39 +1,11 @@
-import type { NativeImage, OffscreenSharedTexture, Rectangle } from "electron";
+import type { NativeImage, OffscreenSharedTexture, OffscreenSoftwareFrame, Rectangle } from "electron";
 import type { Surface } from "../react";
 import { damageOf, paintedNothing } from "./types";
-
-
-
-// we need to add this type, its based on an electron patch this project owns
-export interface ShmFrame {
-  release(): void;
-  frameInfo: {
-    pixelFormat: string;
-    widgetType: string;
-    codedSize: { width: number; height: number };
-    contentRect: Rectangle;
-    stride: number;
-    dataSize: number;
-    timestamp: number;
-    metadata: {
-      captureUpdateRect?: Rectangle;
-      sourceSize?: { width: number; height: number };
-      frameCount: number;
-    };
-    fd: number;
-  };
-}
-
-export function shmFrameOf(event: unknown): ShmFrame | undefined {
-  const frame = (event as { softwareFrame?: ShmFrame | null }).softwareFrame;
-  return frame ?? undefined;
-}
-
 
 export function presentPaint(
   surface: Surface,
   texture: OffscreenSharedTexture | undefined,
-  shmFrame: ShmFrame | undefined,
+  shmFrame: OffscreenSoftwareFrame | undefined,
   image: NativeImage,
   dirtyRect: Rectangle,
   wholeSurface: boolean,
@@ -42,7 +14,6 @@ export function presentPaint(
   if (shmFrame) return presentShmFrame(surface, shmFrame, dirtyRect, wholeSurface);
   return presentBitmap(surface, image, wholeSurface ? undefined : dirtyRect);
 }
-
 
 function presentTexture(
   surface: Surface,
@@ -62,10 +33,9 @@ function presentTexture(
   }
 }
 
-
 function presentShmFrame(
   surface: Surface,
-  frame: ShmFrame,
+  frame: OffscreenSoftwareFrame,
   dirtyRect: Rectangle,
   wholeSurface: boolean,
 ): boolean {
@@ -127,7 +97,6 @@ interface PendingBitmap {
   damage?: Rectangle;
   whole: boolean;
 }
-
 
 export class BitmapPresenter {
   private readonly surface: Surface;

@@ -1,9 +1,7 @@
 import type { EngineKeyEvent } from "../react";
 import type { Guest } from "./server";
 
-// What the pane shows: the owner's own tree plus every guest that joined, one
-// tab each. Index 0 is always the owner. Plain store so both the strip (React)
-// and the key router (not React) read the same state.
+
 
 export interface ShellTab {
   key: string;
@@ -83,7 +81,6 @@ export class Shell {
     else this.guests[index - 1]?.close();
   }
 
-  // Who takes the tty when the owner leaves: the guest being looked at, else the first.
   successor(): Guest | null {
     return this.activeGuest() ?? this.guests[0] ?? null;
   }

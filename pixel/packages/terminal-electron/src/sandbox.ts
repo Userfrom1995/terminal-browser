@@ -50,19 +50,20 @@ function apparmorProfile(electronBinary: string): boolean {
 
 export function linuxSandboxError(electronBinary: string): string | null {
   if (process.getuid?.() === 0) {
-    return "[placeholder copy: Linux sandbox cannot run as root. Run terminal-electron as a non-root user.]";
+    return "Linux sandbox cannot run as root. Run terminal-electron as a non-root user.]";
   }
+  // look into all these cases some are new 
 
   if (setuidSandbox(electronBinary)) return null;
 
   if (apparmorProfile(electronBinary)) return null;
 
   if (kernelSetting("/proc/sys/user/max_user_namespaces") === "0") {
-    return "[placeholder copy: This machine sets user.max_user_namespaces to 0, so nothing can create the user namespaces the chromium sandbox needs. Raise it with: sudo sysctl -w user.max_user_namespaces=15000 (write it to /etc/sysctl.d/ to keep it across reboots), or install a root-owned setuid chrome-sandbox helper.]";
+    return "This machine sets user.max_user_namespaces to 0, so nothing can create the user namespaces the chromium sandbox needs. Raise it with: sudo sysctl -w user.max_user_namespaces=15000 (write it to /etc/sysctl.d/ to keep it across reboots), or install a root-owned setuid chrome-sandbox helper.]";
   }
 
   if (kernelSetting("/proc/sys/kernel/apparmor_restrict_unprivileged_userns") === "1") {
-    return "[placeholder copy: AppArmor blocks unprivileged user namespaces, which the chromium sandbox needs. Run: sudo bash node_modules/terminal-electron/scripts/apparmor.sh <electron binary>]";
+    return "AppArmor blocks unprivileged user namespaces, which the chromium sandbox needs. Run: sudo bash node_modules/terminal-electron/scripts/apparmor.sh <electron binary>]";
   }
 
   if (kernelSetting("/proc/sys/kernel/unprivileged_userns_clone") === "0") {

@@ -16,8 +16,6 @@ import { RootContext, useRegistryColors } from "../registry";
 import type { ViewEntry } from "../registry";
 import type { Guest, GuestFrame } from "./server";
 
-// A guest's pixels in the owner's tree. Its rect becomes the guest's terminal
-// size, input inside it is forwarded, and its frames land in a surface.
 
 export function GuestView({ guest, active }: { guest: Guest; active: boolean }) {
   const registry = useContext(RootContext);
@@ -103,7 +101,7 @@ export function GuestView({ guest, active }: { guest: Guest; active: boolean }) 
     };
     if (!greeted.current) {
       greeted.current = true;
-      guest.send({ type: "hello", ...size, colors, focused: active });
+      guest.send({ type: "init", ...size, colors, focused: active });
       return;
     }
     guest.send({ type: "size", ...size });
@@ -131,8 +129,7 @@ export function GuestView({ guest, active }: { guest: Guest; active: boolean }) 
     });
   };
 
-  // Trackpad deltas the owner already paired with its scroll helper go through
-  // as pixels; plain wheel ticks stay ticks so the guest smooths them itself.
+
   const scroll = (event: WheelEvent) => {
     if (event.precise) {
       guest.send({

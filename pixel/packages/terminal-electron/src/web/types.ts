@@ -10,7 +10,6 @@ export interface WebViewState {
   canGoForward: boolean;
   findMatches: { active: number; total: number } | null;
   zoom: number;
-  /** [placeholder copy: Path of a 32px PNG or ICO file with the page's icon, once fetched; null before that and after moving to another host.] */
   favicon: string | null;
 }
 

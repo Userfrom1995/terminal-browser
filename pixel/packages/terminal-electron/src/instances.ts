@@ -4,9 +4,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 
-// Every root that owns a tty advertises itself here. A root starting on a tty
-// that is already advertised becomes that owner's guest instead of a second
-// program fighting over the same pane.
+
 
 export const PROTOCOL = 1;
 
@@ -111,10 +109,7 @@ export function announceGuest(owner: Instance, name: string): { pane: string; en
   };
 }
 
-// A tab handoff has a gap: the outgoing owner drops its record before the
-// successor has taken the tty over and written its own. This marker spans that
-// gap so the launcher keeps standing in for the pane instead of handing the
-// prompt back and hanging up the successor with it.
+
 function handoffMarker(tty: string, env: NodeJS.ProcessEnv = process.env): string {
   return path.join(instancesDir(env), `${instanceKey(tty)}.handoff`);
 }
@@ -132,8 +127,7 @@ export function clearHandoff(tty: string, env: NodeJS.ProcessEnv = process.env):
   } catch {}
 }
 
-// A marker older than a handoff could ever take is from a process that died
-// mid-handoff; ignore it so the launcher never waits on nobody.
+
 function handoffPending(tty: string, env: NodeJS.ProcessEnv = process.env): boolean {
   try {
     return Date.now() - Number(fs.readFileSync(handoffMarker(tty, env), "utf8")) < 20000;
@@ -142,9 +136,7 @@ function handoffPending(tty: string, env: NodeJS.ProcessEnv = process.env): bool
   }
 }
 
-// Resolves once no live root owns the tty and no handoff is mid-flight. An
-// owner hands over to a successor by closing its socket, so each owner is
-// watched until its socket drops.
+
 export async function waitForOwners(tty: string, env: NodeJS.ProcessEnv = process.env): Promise<void> {
   const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
   for (;;) {

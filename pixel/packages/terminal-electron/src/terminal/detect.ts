@@ -33,7 +33,7 @@ export async function checkTerminal(
 export function cannotOpenPanes(terminal: Terminal | null): string {
   const who = terminal
     ? `${terminal.name} cannot open panes from a command`
-    : "[placeholder copy: terminal-electron does not recognise this terminal]";
+    : "unrecogonized terminal";
   const recommendation =
     process.platform === "darwin"
       ? "We recommend Ghostty (https://ghostty.org/download)."

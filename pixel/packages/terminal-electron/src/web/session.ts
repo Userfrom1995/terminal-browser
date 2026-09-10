@@ -17,7 +17,6 @@ export const THEME_CHANNEL = "terminal-electron:theme";
 export const THEME_REQUEST_CHANNEL = "terminal-electron:theme-request";
 export const QUIT_CHANNEL = "terminal-electron:quit";
 
-// Written to disk at runtime rather than shipped as a file so bundling the
 // library into an app keeps working.
 const API_PRELOAD_SOURCE = `if (process.isMainFrame) {
   const { ipcRenderer } = require("electron");
@@ -74,8 +73,7 @@ export interface EmbedderHost {
   quit(host: PageHost): void;
 }
 
-// One process can run several roots (one per terminal pane), so the ipc
-// handlers are installed once and find the root that owns the sending page.
+
 const embedders = new Set<EmbedderHost>();
 
 function ownerOf(event: IpcMainEvent): { embedder: EmbedderHost; host: PageHost } | null {

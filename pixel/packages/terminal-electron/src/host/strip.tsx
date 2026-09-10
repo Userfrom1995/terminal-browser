@@ -8,9 +8,6 @@ import { makeTheme } from "../theme";
 import { GuestView } from "./guest";
 import type { Shell } from "./shell";
 
-// Wraps the owner's tree. Invisible until a guest joins; then a row of tabs
-// with the owner first and each guest after it.
-
 export function PaneShell({ shell, children }: { shell: Shell; children: ReactNode }) {
   const registry = useContext(RootContext);
   if (!registry) throw new Error("PaneShell outside a root");
@@ -20,8 +17,7 @@ export function PaneShell({ shell, children }: { shell: Shell; children: ReactNo
   const rem = registry.root.info.basePx;
   const [hovered, setHovered] = useState<string | null>(null);
   const closeSlot = rem * 0.95;
-  // The wrapper never changes shape, so a guest joining cannot remount the
-  // owner's tree; the strip is simply hidden while the owner is alone.
+
   return (
     <Box style={{ flexDirection: "column", width: "100%", height: "100%" }}>
       <Box

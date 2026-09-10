@@ -13,7 +13,7 @@ export function offscreenPreferences(
     useSharedTexture: false,
     useSharedMemory: SHM_FRAMES,
     deviceScaleFactor,
-  } as Electron.WebPreferences["offscreen"];
+  }
 }
 
 export function initOffscreenMode(sharedTextures: boolean): void {

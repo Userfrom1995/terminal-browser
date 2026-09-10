@@ -282,7 +282,6 @@ export const REMOTE_BUNDLES_DIR = '${XDG_DATA_HOME:-$HOME/.local/share}/terminal
 
 export interface BundleOptions extends SshOptions {
   status: StatusLine;
-  /** [placeholder copy: Directory on the remote machine that bundles are installed under.] */
   remoteBase?: string;
 }
 

@@ -50,34 +50,23 @@ export interface RootOptions
     | "onHostClosed"
     | "onHandoff"
   > {
-  /** [placeholder copy: How this app is named when it shares a pane with another terminal-electron app. Defaults to the package name.] */
   name?: string;
-  /** [placeholder copy: Runs before the focused WebView sees a key. Return true to keep the key from reaching it.] */
   onKey?: (event: EngineKeyEvent) => boolean | void;
-  /** [placeholder copy: Called when a page asks to quit through terminalElectron.quit() or a terminal-electron://quit link. The default stops the root.] */
   onQuit?: (view: WebViewHandle | null) => void;
-  /** [placeholder copy: Called once the root has stopped and the terminal is restored. The default exits the process with the code.] */
   onExit?: (code: number) => void;
 }
 
-/** [placeholder copy: WebView props other than what a page filling the pane decides for itself.] */
 export type LoadOptions = Omit<WebViewProps, "src" | "style" | "hidden" | "autoFocus">;
 
 export interface Root extends Omit<PixelRoot, "render" | "flushSync" | "stop" | "retarget"> {
-  /** [placeholder copy: Device pixels per css pixel that WebViews render at, from the terminal or the display.] */
   readonly displayScale: number;
-  /** [placeholder copy: True while this app is drawn inside another terminal-electron app's pane.] */
   readonly hosted: boolean;
   render(element: ReactNode): void;
-  /** [placeholder copy: Shows one page filling the pane, like BrowserWindow.loadURL. The first call creates the page with the options given; later calls navigate it. Returns the page's handle. For anything beside the page, use render.] */
   loadURL(url: string, options?: LoadOptions): WebViewHandle;
-  /** [placeholder copy: loadURL for a local file.] */
   loadFile(file: string, options?: LoadOptions): WebViewHandle;
-  /** [placeholder copy: Closes every WebView, restores the terminal and calls onExit.] */
   stop(code?: number): void;
 }
 
-// Inherited stdio is non-blocking under node, so the engine opens the tty by path.
 function ownTty(): string | undefined {
   try {
     const out = execFileSync("tty", { stdio: ["inherit", "pipe", "ignore"], encoding: "utf8" }).trim();
@@ -122,8 +111,7 @@ export function createRoot(options: RootOptions = {}): Root {
   }
   const env = options.sessionEnv ?? process.env;
   const terminal = detect(env);
-  // Read from the session's environment, not the process's: a daemon serving
-  // several panes gets these per session from whoever asked for it.
+
   const tty = options.tty ?? env.TERMINAL_ELECTRON_TTY ?? ownTty();
 
   const embed = env.TERMINAL_ELECTRON_EMBED ?? null;
@@ -156,7 +144,6 @@ export function createRoot(options: RootOptions = {}): Root {
       // wait whats going on here 
       engineRoot.setPointerShape("text");
     } catch {}
-    // The tty is released here; only then may guests learn the owner is gone.
     try {
       engineRoot.stop();
     } catch {}
@@ -171,9 +158,7 @@ export function createRoot(options: RootOptions = {}): Root {
     else app.exit(code);
   };
 
-  // After a handoff this process only exits once the successor is findable, so
-  // the launcher waiting on it never sees a tty with no owner. Taking over a
-  // tty means probing it, which can take a few seconds.
+
   const finishAfterSuccessor = (code: number) => {
     if (!tty) return finish(code);
     const deadline = Date.now() + 15000;
@@ -200,8 +185,7 @@ export function createRoot(options: RootOptions = {}): Root {
         : undefined,
     wrapper: options.wrapper ?? (owner || embed ? undefined : terminal?.wrapper),
     keyEventTypes: true,
-    // Engine devtools (right-click menu, inspect, profiler) follow the WebView
-    // default: on while developing, off in production builds.
+
     devtools: options.devtools ?? process.env.NODE_ENV !== "production",
     onKey: (event) => {
       if (shell.handleKey(event)) return;
@@ -276,7 +260,6 @@ export function createRoot(options: RootOptions = {}): Root {
   };
   installEmbedderApi(embedder);
 
-  // Owning the tty means listening for guests and being findable by them.
   const becomeOwner = () => {
     if (!tty || !socketPath) return;
     owner = null;
@@ -307,8 +290,7 @@ export function createRoot(options: RootOptions = {}): Root {
     );
   };
 
-  // The owner is leaving. Whoever it named takes the tty, everyone else
-  // reconnects to that new owner once its socket exists.
+
   const ownerLeft = async () => {
     if (stopping) return;
     const next = embed ? null : handoff;
@@ -336,8 +318,7 @@ export function createRoot(options: RootOptions = {}): Root {
     }
   };
 
-  // Closing the owner's own tab with guests around hands the pane to one of
-  // them rather than taking everyone down.
+
   shell.onCloseOwner = () => {
     const successor = shell.successor();
     if (!successor || !tty || !socketPath) {
