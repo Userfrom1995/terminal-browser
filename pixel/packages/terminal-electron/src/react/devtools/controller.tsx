@@ -3,11 +3,13 @@ import { ConcurrentRoot } from "react-reconciler/constants";
 
 import {
   APP_VIEW,
+  Bridge,
   Container,
   DEVTOOLS_VIEW,
-  getBridge,
+  devtoolsBridge,
   Instance,
   reconciler,
+  setDevtoolsBridge,
 } from "../reconciler-config";
 import { DevtoolsApp } from "./app";
 import {
@@ -25,14 +27,14 @@ export const DEFAULT_SPLIT = 0.58;
 let devtoolsRoot: any = null;
 
 export function engineOp(op: Record<string, unknown>) {
-  const b = getBridge();
+  const b = devtoolsBridge();
   b.push(DEVTOOLS_VIEW, op);
   b.flush();
 }
 
 function mountDevtools() {
   if (devtoolsRoot) return;
-  const b = getBridge();
+  const b = devtoolsBridge();
   const container: Container = { bridge: b, view: DEVTOOLS_VIEW, children: [] };
   b.containers[DEVTOOLS_VIEW] = container;
   devtoolsRoot = reconciler.createContainer(
@@ -46,6 +48,15 @@ function mountDevtools() {
     null
   );
   reconciler.updateContainer(createElement(DevtoolsApp), devtoolsRoot, null, null);
+}
+
+// Moves the devtools to another root: whatever is open on the previous one is
+// closed there first, since the engine split and the mounted tree are per bridge.
+export function attachDevtools(bridge: Bridge) {
+  if (devtoolsBridge() === bridge) return;
+  if (devtoolsStore.get().open) closeDevtools();
+  unmountDevtools();
+  setDevtoolsBridge(bridge);
 }
 
 export function openDevtools(selectId?: number) {
@@ -72,11 +83,11 @@ export function unmountDevtools() {
     reconciler.updateContainer(null, devtoolsRoot, null, null);
   });
   devtoolsRoot = null;
-  getBridge().containers[DEVTOOLS_VIEW] = null;
+  devtoolsBridge().containers[DEVTOOLS_VIEW] = null;
 }
 
 export function findInstance(id: number): Instance | null {
-  const container = getBridge().containers[APP_VIEW];
+  const container = devtoolsBridge().containers[APP_VIEW];
   if (!container) return null;
   const stack: Instance[] = [...container.children];
   while (stack.length) {
@@ -138,7 +149,7 @@ export function setCpuThrottle(rate: number) {
 }
 
 export function requestLayout() {
-  const b = getBridge();
+  const b = devtoolsBridge();
   b.push(APP_VIEW, { op: "queryLayout" });
   b.flush();
 }

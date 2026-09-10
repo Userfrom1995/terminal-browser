@@ -45,6 +45,14 @@ function sha256(bytes) {
   return crypto.createHash("sha256").update(bytes).digest("hex");
 }
 
+function isSymlink(file) {
+  try {
+    return fs.lstatSync(file).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
 function readMarker(file) {
   try {
     return fs.readFileSync(file, "utf8").trim();
@@ -103,7 +111,11 @@ if (!expected) {
   process.stderr.write(`terminal-electron: ${zipName} is missing from ${mirror}/SHASUMS256.txt\n`);
   process.exit(1);
 }
-if (readMarker(marker) === expected) process.exit(0);
+const frameworkBinary = path.join(
+  dest, "Electron.app", "Contents", "Frameworks", "Electron Framework.framework", "Electron Framework",
+);
+const intact = process.platform !== "darwin" || isSymlink(frameworkBinary);
+if (readMarker(marker) === expected && intact) process.exit(0);
 
 // Package managers that copy this package (pnpm file: links, fresh installs)
 // run this script again, so downloaded zips are kept per user and reused.

@@ -7,6 +7,7 @@ import {
   ChangeSource,
   Container,
   DEVTOOLS_VIEW,
+  devtoolsBridge,
   getBridge,
   MarkRef,
   reconciler,
@@ -17,6 +18,7 @@ import { Surface } from "./surface";
 import { handleDevtoolsKey } from "./devtools/app";
 import { installConsoleCapture } from "./devtools/console-capture";
 import {
+  attachDevtools,
   closeDevtools,
   engineOp,
   onEngineProfile,
@@ -283,11 +285,11 @@ export function createRoot(options: RootOptions = {}): PixelRoot {
     options.tty || options.host
       ? new Bridge(options.tty, options.wrapper, options.sessionEnv, options.host)
       : getBridge(options.wrapper);
-  const devtoolsEnabled = options.devtools !== false && bridge === getBridge();
+  const devtoolsEnabled = options.devtools !== false;
   if (options.cwd) setProfileDirectory(options.cwd);
   let devtoolsInstalled = false;
   const enableDevtools = () => {
-    if (devtoolsInstalled || bridge !== getBridge()) return;
+    if (devtoolsInstalled) return;
     devtoolsInstalled = true;
     installConsoleCapture();
     installFiberHook();
@@ -489,14 +491,14 @@ export function createRoot(options: RootOptions = {}): PixelRoot {
           info.height = size.height;
           info.basePx = size.basePx;
           options.onResize?.(size);
-        } else {
+        } else if (devtoolsBridge() === bridge) {
           devtoolsStore.update((s) => ({ ...s, ...size }));
         }
         break;
       }
       case "key": {
         if (view === DEVTOOLS_VIEW) {
-          handleDevtoolsKey(event.key!);
+          if (devtoolsBridge() === bridge) handleDevtoolsKey(event.key!);
         } else {
           options.onKey?.({
             key: event.key!,
@@ -520,10 +522,13 @@ export function createRoot(options: RootOptions = {}): PixelRoot {
         break;
       case "devtools":
         enableDevtools();
+        attachDevtools(bridge);
         toggleDevtools();
         break;
       case "inspect":
         if (devtoolsEnabled && view === APP_VIEW && event.node != null) {
+          enableDevtools();
+          attachDevtools(bridge);
           openDevtools(event.node);
           selectNode(event.node, true);
         }
@@ -697,17 +702,18 @@ export function createRoot(options: RootOptions = {}): PixelRoot {
       reconciler.flushSync(() => {
         reconciler.updateContainer(null, root, null, null);
       });
-      unmountDevtools();
+      if (devtoolsBridge() === bridge) unmountDevtools();
       bridge.engine.stop();
       if (ownsStdout) process.stdout.off("resize", forwardResize);
       process.off("exit", restore);
     },
     openDevtools() {
       enableDevtools();
+      attachDevtools(bridge);
       openDevtools();
     },
     closeDevtools() {
-      closeDevtools();
+      if (devtoolsBridge() === bridge) closeDevtools();
     },
     // shitty name     
     nudgeResize() {

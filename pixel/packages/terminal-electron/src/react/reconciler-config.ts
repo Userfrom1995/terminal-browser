@@ -306,6 +306,18 @@ export function getBridge(wrapper?: string): Bridge {
   return defaultBridge;
 }
 
+// One devtools UI exists per process; it attaches to whichever root last asked
+// for it, so a daemon serving several panes can inspect any of them.
+let devtoolsBridgeRef: Bridge | null = null;
+
+export function devtoolsBridge(): Bridge {
+  return devtoolsBridgeRef ?? getBridge();
+}
+
+export function setDevtoolsBridge(bridge: Bridge): void {
+  devtoolsBridgeRef = bridge;
+}
+
 function textOf(children: React.ReactNode): string {
   if (children == null || typeof children === "boolean") return "";
   if (typeof children === "string" || typeof children === "number") {
