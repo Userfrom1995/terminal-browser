@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import net from "node:net";
 import path from "node:path";
 
-import { app } from "electron";
+import { app, clipboard, screen } from "electron";
 import { createRoot } from "@zenbu-labs/pixel";
 import type {
   DevtoolsDock,
@@ -18,6 +18,8 @@ import type { Pane, Terminal } from "@zenbu-labs/pixel/terminal";
 import { bundledAsset } from "../assets";
 import { CopyOnSelect, Grab, reactGrabPreloadPath } from "../grab/grab";
 import { AgentPaneFinder } from "../grab/target";
+import { frameBudgetMbps, maxFps, renderEnv } from "../config/render";
+import { ENGINE_LOG_FILE } from "../config/settings";
 import type { EmbeddedAgent } from "../grab/target";
 import type { ZoomDirection } from "../zoom";
 import {
@@ -53,6 +55,7 @@ import type {
   PageMenuView,
   TabActions,
   TabView,
+  ToastView,
 } from "../ui/types";
 import { displayUrl, normalizeUrl, searchOrUrl, searchUrlFor } from "../url";
 import type { SearchUrl } from "../url";
@@ -61,11 +64,22 @@ import type { PageContext } from "../pages/scheme";
 import { makeTheme } from "../ui/theme";
 import { fuzzyScore } from "./fuzzy";
 import { clampDevtoolsFraction, computeLayout, dividerFraction, recordBarHeight } from "./layout";
+
+// Installed builds run from a dist root; anything else is a source checkout.
+const DEV_BUILD = !process.env.TERMINAL_BROWSER_DIST_ROOT;
 import type { DevtoolsPlacement, SurfaceLayout } from "./layout";
 import { SUGGESTIONS_OFF } from "../config/search";
 import { SettingsManager } from "./settings";
 import { fetchSuggestions } from "./suggest";
 import { TabManager } from "./tabs";
+
+function displayHz(): number {
+  try {
+    return Math.max(0, screen.getPrimaryDisplay().displayFrequency);
+  } catch {
+    return 0;
+  }
+}
 import type { Tab } from "./tabs";
 
 export interface SessionContext {
@@ -168,6 +182,7 @@ class Session {
   private readonly settings = new SettingsManager(
     {
       requestRender: () => this.render(),
+      settingsChanged: () => this.applyRenderSettings(),
       toast: (text, state) => this.showToast(text, state),
       setClipboard: (text) => this.root?.setClipboard(text),
       openUrl: (url) => this.tabs.create(url),
@@ -214,8 +229,8 @@ class Session {
   private zoomHudTimer: ReturnType<typeof setTimeout> | null = null;
   private download: DownloadView | null = null;
   private downloadTimer: ReturnType<typeof setTimeout> | null = null;
-  private toast: { text: string; detail?: string; failed: boolean; alert: boolean } | null =
-    null;
+  private toast: ToastView | null = null;
+  private profiling = false;
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
   private records = new Map<number, RecordSession>();
   private grabs = new Map<number, Grab>();
@@ -304,7 +319,7 @@ class Session {
     this.root = createRoot({
       name: "terminal-browser",
       tty: this.ctx.tty,
-      sessionEnv: this.ctx.env,
+      sessionEnv: { ...this.ctx.env, ...renderEnv((key) => this.settings.get(key)) },
       cwd: this.ctx.cwd,
       onKey: (event) => this.handleKey(event),
       onResize: () => {
@@ -323,6 +338,7 @@ class Session {
     });
     this.fontId = await this.root.registerFont(bundledFontPath());
     this.settings.setNoSuper(!this.root.info.kittyKeyboard);
+    this.applyRenderSettings();
     this.settings.watch();
     this.recalculateLayout();
     this.root.setPointerShape("default");
@@ -504,6 +520,7 @@ class Session {
         tabViews={this.tabViews()}
         tabActions={this.tabActions}
         devtools={this.devtoolsView()}
+        profiling={this.profiling}
       />,
     );
   }
@@ -531,6 +548,7 @@ class Session {
       this.render();
     },
     paletteRun: (index) => this.runPalette(index),
+    profileStop: () => void this.toggleProfile(),
     paletteClose: () => this.closePalette(),
     tabSwitch: (id) => this.tabs.activate(id),
     tabClose: (id) => this.closeOrShutdown(id),
@@ -913,15 +931,64 @@ class Session {
     this.render();
   }
 
-  private showToast(text: string, state: "done" | "failed" | "alert", detail?: string) {
-    this.toast = { text, detail, failed: state === "failed", alert: state === "alert" };
+  private showToast(
+    text: string,
+    state: "done" | "failed" | "alert",
+    detail?: string,
+    action?: ToastView["action"],
+  ) {
+    this.toast = { text, detail, failed: state === "failed", alert: state === "alert", action };
     if (this.toastTimer) clearTimeout(this.toastTimer);
-    this.toastTimer = setTimeout(() => {
-      this.toast = null;
-      this.toastTimer = null;
-      this.render();
-    }, 2000);
+    this.toastTimer = setTimeout(
+      () => {
+        this.toast = null;
+        this.toastTimer = null;
+        this.render();
+      },
+      action ? 8000 : 2000,
+    );
     this.render();
+  }
+
+  private async toggleProfile() {
+    if (!this.root) return;
+    if (!this.profiling) {
+      this.root.startProfile();
+      this.profiling = true;
+      this.render();
+      return;
+    }
+    this.profiling = false;
+    this.render();
+    const exported = await this.root.stopProfile();
+    if (!exported) {
+      this.showToast("nothing was recorded", "failed");
+      return;
+    }
+    clipboard.writeText(exported);
+    const root = this.root;
+    this.showToast("profile path copied to clipboard", "done", undefined, {
+      label: "view profile",
+      run: () => {
+        this.toast = null;
+        this.render();
+        root.openDevtools("profiler");
+      },
+    });
+  }
+
+  private applyRenderSettings() {
+    const root = this.root;
+    if (!root) return;
+    const render = {
+      maxFps: maxFps(this.settings.get("render.fps"), displayHz()),
+      frameBudgetMbps: frameBudgetMbps(this.settings.get("render.bandwidth")),
+      highlightTransmits: this.settings.get("render.transmitOutlines") === "on",
+      frameEvents: this.settings.get("render.frameEvents") === "on",
+      compareFrames: this.settings.get("render.compareFrames") === "on",
+    };
+    root.setRender(render);
+    root.setLogFile(this.settings.get("debug.logFile") === "on" ? ENGINE_LOG_FILE : null);
   }
 
   private blurToOverlay() {
@@ -1346,6 +1413,28 @@ class Session {
       command("record.toggle"),
       command("grab.toggle"),
       command("devtools.toggle"),
+      ...(DEV_BUILD
+        ? [
+          {
+            id: "profile",
+            label: this.profiling ? "stop profile" : "start profile",
+            shortcut: "",
+            run: () => void this.toggleProfile(),
+          },
+          {
+            id: "highlight-transmits",
+            label: this.root?.highlightTransmits()
+              ? "hide transmit outlines"
+              : "show transmit outlines",
+            shortcut: "",
+            run: () =>
+              this.settings.actions.set(
+                "render.transmitOutlines",
+                this.root?.highlightTransmits() ? "off" : "on",
+              ),
+          },
+        ]
+        : []),
       ...(devtoolsOpen
         ? [
             {

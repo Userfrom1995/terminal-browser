@@ -9,6 +9,14 @@ import type {
 } from "@zenbu-labs/pixel";
 import type { RecordActions } from "../record/types";
 
+export interface ToastView {
+  text: string;
+  detail?: string;
+  failed: boolean;
+  alert: boolean;
+  action?: { label: string; run(): void };
+}
+
 export interface PaletteView {
   index: number;
   items: { id: string; label: string; shortcut: string }[];
@@ -55,7 +63,9 @@ export interface PageMenuView {
   items: PageMenuItem[];
 }
 
-export type SettingsSection = "general" | "shortcuts" | "advanced";
+export type SettingGroup = "general" | "performance";
+
+export type SettingsSection = SettingGroup | "shortcuts" | "advanced";
 
 export interface ShortcutRow {
   id: string;
@@ -73,6 +83,7 @@ export interface SettingChoiceView {
 
 export type SettingRow = {
   key: string;
+  group: SettingGroup;
   label: string;
   hint?: string;
   link?: string;
@@ -135,6 +146,7 @@ export interface ChromeActions {
   pageMenuAction(id: string): void;
   pageMenuClose(): void;
   settings: SettingsActions;
+  profileStop(): void;
   record: RecordActions;
 }
 

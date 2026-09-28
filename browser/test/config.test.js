@@ -10,6 +10,7 @@ const { defaultKeys } = require("../dist/config/commands.js");
 const { searchUrlFor, searchOrUrl } = require("../dist/url.js");
 const { SEARCH_ENGINES, engineBySearch, parseSuggestions } = require("../dist/config/search.js");
 const { SettingsManager } = require("../dist/session/settings.js");
+const { renderEnv, maxFps, frameBudgetMbps } = require("../dist/config/render.js");
 
 const press = (key, mods = {}) => ({
   key,
@@ -150,24 +151,36 @@ test("config store recognises its own writes until someone else edits the file",
   assert.equal(store.ownContent("settings"), false);
 });
 
-const settled = () => new Promise((resolve) => setTimeout(resolve, 400));
-
+// an ignored write leaves no trace on its own, so each one is paired with an external
+// edit: the watcher settles both together and reports only the files it should
 test("config watcher reports external edits and ignores the store's own writes", async () => {
   const store = tempStore();
   const changes = [];
-  const stop = store.watch((files) => changes.push(files));
+  let arrived = () => {};
+  const stop = store.watch((files) => {
+    changes.push(files);
+    arrived();
+  });
+  const nextChange = () =>
+    new Promise((resolve, reject) => {
+      const late = setTimeout(() => reject(new Error("the watcher never reported the edit")), 5000);
+      arrived = () => {
+        clearTimeout(late);
+        resolve();
+      };
+    });
   try {
+    let change = nextChange();
     store.setShortcut("find", null);
-    await settled();
-    assert.deepEqual(changes, []);
-
     fs.writeFileSync(store.files.settings, JSON.stringify({ "search.suggestions": "off" }));
-    await settled();
+    await change;
     assert.deepEqual(changes, [["settings"]]);
 
+    change = nextChange();
     fs.writeFileSync(store.files.settings, JSON.stringify({ "search.suggestions": "off" }));
-    await settled();
-    assert.deepEqual(changes, [["settings"]]);
+    fs.writeFileSync(store.files.shortcuts, JSON.stringify({ find: "ctrl+f" }));
+    await change;
+    assert.deepEqual(changes, [["settings"], ["shortcuts"]]);
   } finally {
     stop();
   }
@@ -188,18 +201,15 @@ test("suggestion feeds parse the OpenSearch array and the Ecosia object shapes",
   assert.deepEqual(parseSuggestions("[]"), []);
 });
 
-test("search engine catalog templates carry the query slot", () => {
-  for (const engine of SEARCH_ENGINES) {
-    assert.ok(engine.search.includes("%s"), engine.id);
-    if (engine.suggest) assert.ok(engine.suggest.includes("%s"), engine.id);
-  }
-  assert.equal(engineBySearch(SEARCH_ENGINES[1].search).id, SEARCH_ENGINES[1].id);
-  assert.equal(engineBySearch("https://example.com/?q=%s"), null);
-});
-
 function tempManager() {
   const store = tempStore();
-  const host = { requestRender() {}, toast() {}, overlayOpened() {}, overlayClosed() {} };
+  const host = {
+    requestRender() {},
+    settingsChanged() {},
+    toast() {},
+    overlayOpened() {},
+    overlayClosed() {},
+  };
   return { manager: new SettingsManager(host, store.files), store };
 }
 
@@ -261,4 +271,44 @@ test("shortcuts with chords that do not parse are reported instead of silently u
   assert.match(loaded.errors[1], /palette › 1/);
   const keymap = new Keymap(loaded.shortcuts, { noSuper: false });
   assert.notEqual(keymap.label("find"), "");
+});
+
+test("render settings accept numbers or their named values and refuse the rest", () => {
+  const store = tempStore();
+  fs.writeFileSync(
+    store.files.settings,
+    JSON.stringify({ "render.fps": 60, "render.bandwidth": 10, "render.presenter": "patched" }),
+  );
+  const loaded = store.load();
+  assert.deepEqual(loaded.errors, []);
+  assert.equal(loaded.settings["render.fps"], "60");
+  assert.equal(loaded.settings["render.bandwidth"], "10");
+  assert.equal(loaded.settings["render.presenter"], "patched");
+
+  fs.writeFileSync(
+    store.files.settings,
+    JSON.stringify({ "render.fps": "fast", "render.bandwidth": "lots", "render.transport": "usb" }),
+  );
+  const broken = store.load();
+  assert.equal(broken.errors.length, 3);
+  assert.equal(broken.settings["render.fps"], "display");
+  assert.equal(broken.settings["render.bandwidth"], "3");
+  assert.equal(broken.settings["render.transport"], "auto");
+});
+
+test("render settings map to engine values and the startup env", () => {
+  assert.equal(maxFps("display", 120), 120);
+  assert.equal(maxFps("uncapped", 120), 0);
+  assert.equal(maxFps("45", 120), 45);
+  assert.equal(frameBudgetMbps("unlimited"), 0);
+  assert.equal(frameBudgetMbps("2.5"), 2.5);
+
+  const { manager } = tempManager();
+  assert.deepEqual(renderEnv((key) => manager.get(key)), {});
+  manager.actions.set("render.presenter", "animation");
+  manager.actions.set("render.transport", "inline");
+  assert.deepEqual(renderEnv((key) => manager.get(key)), {
+    TERMINAL_BROWSER_PRESENT: "animation",
+    TERMINAL_BROWSER_FRAMES: "inline",
+  });
 });

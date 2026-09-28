@@ -3,6 +3,7 @@ import type { SettingsSection } from "../types";
 export const copy = {
   sections: {
     general: "general",
+    performance: "performance",
     shortcuts: "shortcuts",
     advanced: "advanced",
   } satisfies Record<SettingsSection, string>,

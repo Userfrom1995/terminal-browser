@@ -4,6 +4,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "browser": "node scripts/dev.mjs",
+    "start:fresh": "scripts/start-fresh.sh",
     "types": "scripts/plugin-types.sh",
     "postinstall": "scripts/plugin-types.sh --if-missing",
     "build:dist": "scripts/release.sh \"local-$(git rev-parse --short HEAD)\"",
@@ -11,7 +12,8 @@
     "dist": "pnpm build:dist && pnpm install:dist",
     "release:patch": "scripts/tag-release.sh patch",
     "release:minor": "scripts/tag-release.sh minor",
-    "release:major": "scripts/tag-release.sh major"
+    "release:major": "scripts/tag-release.sh major",
+    "monitor": "pnpm --filter terminal-browser-monitor start"
   },
   "packageManager": "pnpm@10.13.1",
   "devDependencies": {

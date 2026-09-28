@@ -4,7 +4,7 @@ import { Box, Image, Input, Text } from "@zenbu-labs/pixel";
 import { Icon } from "../icons";
 import { withAlpha } from "../theme";
 import type { Theme } from "../theme";
-import type { SettingChoiceView, SettingRow, SettingsActions, SettingsView } from "../types";
+import type { SettingChoiceView, SettingGroup, SettingRow, SettingsActions, SettingsView } from "../types";
 import { copy } from "./copy";
 import { ScrollPane } from "./scroll-pane";
 import { IconButton } from "./controls";
@@ -12,20 +12,23 @@ import { IconButton } from "./controls";
 const TILES_PER_ROW = 4;
 
 export function GeneralPane({
+  group,
   view,
   actions,
   rem,
   theme,
 }: {
+  group: SettingGroup;
   view: SettingsView;
   actions: SettingsActions;
   rem: number;
   theme: Theme;
 }) {
+  const rows = view.settings.filter((row) => row.group === group);
   return (
     <ScrollPane
       rem={rem}
-      resetKey={view.settings.length}
+      resetKey={rows.length}
       style={{
         flexGrow: 1,
         flexBasis: 0,
@@ -33,7 +36,7 @@ export function GeneralPane({
         padding: { top: rem * 0.6, bottom: rem * 0.8 },
       }}
     >
-      {view.settings.map((row) => (
+      {rows.map((row) => (
         <SettingLine key={row.key} row={row} actions={actions} rem={rem} theme={theme} />
       ))}
     </ScrollPane>
@@ -269,13 +272,13 @@ function ChoiceTile({
         gap: rem * 0.5,
         padding: { left: rem * 0.6, right: rem * 0.6 },
         cornerRadius: rem * 0.35,
-        background: selected ? withAlpha(theme.accent, 40) : theme.field,
-        hoverBackground: selected ? withAlpha(theme.accent, 60) : theme.hoverStrong,
-        border: { width: 1, color: selected ? theme.accent : theme.fieldBorder },
+        background: selected ? theme.hoverStrong : theme.field,
+        hoverBackground: theme.hoverStrong,
+        border: { width: 1, color: selected ? theme.muted : theme.fieldBorder },
       }}
       onClick={onClick}
     >
-      <ChoiceMark choice={choice} size={rem * 1.15} theme={theme} />
+      {choice.logo && <ChoiceLogo src={choice.logo} size={rem * 1.15} />}
       <Text
         style={{
           flexGrow: 1,
@@ -292,19 +295,10 @@ function ChoiceTile({
   );
 }
 
-function ChoiceMark({
-  choice,
-  size,
-  theme,
-}: {
-  choice: SettingChoiceView;
-  size: number;
-  theme: Theme;
-}) {
-  if (!choice.logo) return <Icon icon="close" size={size} color={theme.muted} />;
+function ChoiceLogo({ src, size }: { src: string; size: number }) {
   return (
     <Image
-      src={choice.logo}
+      src={src}
       error={<Box style={{ width: size, height: size }} />}
       style={{ width: size, height: size, cornerRadius: size * 0.2, flexShrink: 0 }}
     />

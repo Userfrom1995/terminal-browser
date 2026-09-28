@@ -17,6 +17,7 @@ import type { SettingRow, SettingsActions, SettingsSection, SettingsView } from 
 
 export interface SettingsHost {
   requestRender(): void;
+  settingsChanged(): void;
   toast(text: string, state: "done" | "failed"): void;
   setClipboard(text: string): void;
   openUrl(url: string): void;
@@ -33,7 +34,14 @@ interface Modal {
 
 function settingRow(key: SettingKey, value: string): SettingRow {
   const def = SETTINGS[key];
-  const base = { key, label: def.label, hint: def.hint, link: def.link, modified: value !== def.default };
+  const base = {
+    key,
+    group: def.group,
+    label: def.label,
+    hint: def.hint,
+    link: def.link,
+    modified: value !== def.default,
+  };
   if (!def.choices) return { ...base, kind: "string", value };
   const choices = def.choices.map((choice) => ({
     ...choice,
@@ -105,6 +113,7 @@ export class SettingsManager {
     if (loaded.settings) this.values = loaded.settings;
     if (loaded.shortcuts) this.overrides = loaded.shortcuts;
     this.map = new Keymap(this.overrides, { noSuper: this.noSuper });
+    if (loaded.settings) this.host.settingsChanged();
     this.host.requestRender();
     if (loaded.errors.length) this.host.toast(loaded.errors[0], "failed");
     else if (announce) this.host.toast("config reloaded", "done");

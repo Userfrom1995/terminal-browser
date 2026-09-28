@@ -9,7 +9,7 @@ import { ShortcutsPane } from "./shortcuts";
 import { GeneralPane } from "./general";
 import { AdvancedPane } from "./advanced";
 
-const SECTIONS: SettingsSection[] = ["general", "shortcuts", "advanced"];
+const SECTIONS: SettingsSection[] = ["general", "performance", "shortcuts", "advanced"];
 
 export function SettingsCard({
   view,
@@ -96,7 +96,13 @@ export function SettingsCard({
           ) : view.section === "advanced" ? (
             <AdvancedPane view={view} actions={actions} rem={rem} theme={theme} />
           ) : (
-            <GeneralPane view={view} actions={actions} rem={rem} theme={theme} />
+            <GeneralPane
+              group={view.section === "performance" ? "performance" : "general"}
+              view={view}
+              actions={actions}
+              rem={rem}
+              theme={theme}
+            />
           )}
         </Box>
       </Box>

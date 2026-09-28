@@ -1,21 +1,19 @@
 {
-  "name": "terminal-browser-cli",
-  "version": "0.1.0",
+  "name": "terminal-browser-monitor",
   "private": true,
-  "bin": {
-    "terminal-browser": "./dist/main.js"
-  },
+  "main": "dist/main.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "start": "tsc -p tsconfig.json && pixel . --"
   },
   "dependencies": {
     "@zenbu-labs/pixel": "0.0.16",
-    "pixel-store": "workspace:*",
-    "zod": "^4.4.3"
+    "react": "^18.3.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/react": "^18.3.0",
     "typescript": "^5.5.0"
   }
 }
