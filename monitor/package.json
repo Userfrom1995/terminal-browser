@@ -8,7 +8,7 @@
     "start": "tsc -p tsconfig.json && pixel . --"
   },
   "dependencies": {
-    "@zenbu-labs/pixel": "0.0.19",
+    "@zenbu-labs/pixel": "0.0.20",
     "react": "^18.3.1"
   },
   "devDependencies": {

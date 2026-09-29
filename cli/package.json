@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@zenbu-labs/pixel": "file:../../../pixel/packages/pixel",
+    "@zenbu-labs/pixel": "0.0.20",
     "pixel-store": "workspace:*",
     "zod": "^4.4.3"
   },
