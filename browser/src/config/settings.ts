@@ -1,10 +1,11 @@
+import os from "node:os";
 import path from "node:path";
 
 import { LOGS_DIR } from "pixel-store";
 import { z } from "zod";
 
 import type { SettingGroup } from "../ui/types";
-import { AUTO, DISPLAY_FPS, UNCAPPED, UNLIMITED } from "./render";
+import { AUTO, DISPLAY_FPS, UNCAPPED } from "./render";
 import { SEARCH_ENGINES, SUGGESTIONS_OFF } from "./search";
 
 export interface SettingChoice {
@@ -16,8 +17,7 @@ export interface SettingChoice {
 interface SettingDef<S extends z.ZodType> {
   group: SettingGroup;
   label: string;
-  hint?: string;
-  link?: string;
+  hint: string;
   schema: S;
   default: z.infer<S>;
   choices?: SettingChoice[];
@@ -29,26 +29,24 @@ function setting<S extends z.ZodType>(def: SettingDef<S>): SettingDef<S> {
 
 const plain = (value: string, name = value): SettingChoice => ({ value, name, logo: null });
 
-const onOff = [plain("on", "on"), plain("off", "off")];
-
-const NEXT_SESSION = "applies to windows opened after this one";
+const onOff = [plain("on", "On"), plain("off", "Off")];
 
 export const ENGINE_LOG_FILE = path.join(LOGS_DIR, "engine.jsonl");
+const ENGINE_LOG_FILE_SHORT = ENGINE_LOG_FILE.replace(os.homedir() + path.sep, "~" + path.sep);
 
 export const SETTINGS = {
   "search.engine": setting({
     group: "general",
-    label: "search engine",
-    hint: "%s is replaced with search text",
+    label: "Search engine",
+    hint: "Default search engine used for search queries.",
     schema: z.string(),
     default: SEARCH_ENGINES[0].search,
     choices: SEARCH_ENGINES.map(({ search, name, logo }) => ({ value: search, name, logo })),
   }),
   "search.suggestions": setting({
     group: "general",
-    label: "search suggestions",
-    hint: "%s is replaced with search text",
-    link: "https://github.com/dewitt/opensearch/blob/master/mediawiki/Specifications/OpenSearch/Extensions/Suggestions/1.1/Draft%201.wiki",
+    label: "Search suggestions",
+    hint: "Provider for autocomplete suggestions.",
     schema: z.string(),
     default: SEARCH_ENGINES[0].suggest!,
     choices: [
@@ -57,13 +55,13 @@ export const SETTINGS = {
         name,
         logo,
       })),
-      { value: SUGGESTIONS_OFF, name: "off", logo: null },
+      { value: SUGGESTIONS_OFF, name: "Off", logo: null },
     ],
   }),
   "render.fps": setting({
-    group: "performance",
-    label: "frame rate cap",
-    hint: "most frames sent to the terminal per second; display follows the monitor's refresh rate",
+    group: "advanced",
+    label: "Frame rate",
+    hint: "How many times the screen is allowed to update per second.",
     schema: z.coerce
       .string()
       .regex(
@@ -72,76 +70,58 @@ export const SETTINGS = {
       ),
     default: DISPLAY_FPS,
     choices: [
-      plain(DISPLAY_FPS, "display"),
+      plain(DISPLAY_FPS, "Display"),
       plain("30"),
       plain("60"),
-      plain(UNCAPPED, "uncapped"),
+      plain(UNCAPPED, "Uncapped"),
     ],
   }),
   "render.presenter": setting({
-    group: "performance",
-    label: "frame updates",
-    hint: `how changed pixels reach the terminal; ${NEXT_SESSION}`,
+    group: "advanced",
+    label: "Image transmission format",
+    hint: "The format pixels are transmitted to the terminal. Applies to new windows.",
     schema: z.enum([AUTO, "full", "patched", "animation"]),
     default: AUTO,
     choices: [
-      plain(AUTO, "automatic"),
-      plain("full", "whole frame"),
-      plain("patched", "patches"),
-      plain("animation", "kitty animation"),
+      plain(AUTO, "Automatic"),
+      plain("full", "Whole frame"),
+      plain("patched", "Patches"),
+      plain("animation", "Kitty animation"),
     ],
   }),
   "render.transport": setting({
-    group: "performance",
-    label: "frame transport",
-    hint: `how frame pixels get to the terminal; ${NEXT_SESSION}`,
+    group: "advanced",
+    label: "Frame transport",
+    hint: "The mechanism used to transmit pixels to the terminal. Applies to new windows.",
     schema: z.enum([AUTO, "shared", "file", "inline"]),
     default: AUTO,
     choices: [
-      plain(AUTO, "automatic"),
-      plain("shared", "shared memory"),
-      plain("file", "file"),
-      plain("inline", "inline"),
+      plain(AUTO, "Automatic"),
+      plain("shared", "Shared memory"),
+      plain("file", "File"),
+      plain("inline", "Inline"),
     ],
   }),
-  "render.bandwidth": setting({
-    group: "performance",
-    label: "inline bandwidth (MB/s)",
-    hint: "caps pixel bytes per second when frames travel inline, such as over ssh or tmux",
-    schema: z.coerce
-      .string()
-      .regex(/^(unlimited|\d+(\.\d+)?)$/, "expected unlimited or megabytes per second"),
-    default: "3",
-    choices: [plain("1"), plain("3"), plain("10"), plain(UNLIMITED, "unlimited")],
-  }),
-  "render.compareFrames": setting({
-    group: "performance",
-    label: "compare browser frames",
-    hint: "compares each browser frame with the previous one and sends only the pixels that changed; off trusts the browser's dirty rect, which is usually the whole viewport, and sends all of it",
-    schema: z.enum(["on", "off"]),
-    default: "on",
-    choices: onOff,
-  }),
   "render.frameEvents": setting({
-    group: "performance",
-    label: "[placeholder copy: show what the presenter is doing]",
-    hint: "[placeholder copy: prints a note on screen whenever whole frames or folded patches go out, with a status line showing what the terminal is holding]",
+    group: "advanced",
+    label: "Display debug actions",
+    hint: "Overlay internal debugging information at the top of the browser.",
     schema: z.enum(["on", "off"]),
     default: "off",
     choices: onOff,
   }),
   "render.transmitOutlines": setting({
-    group: "performance",
-    label: "outline sent images",
-    hint: "flashes a border around every image sent to the terminal, to see what is being redrawn",
+    group: "advanced",
+    label: "Highlight updates",
+    hint: "Display a border around new images sent to the terminal.",
     schema: z.enum(["on", "off"]),
     default: "off",
     choices: onOff,
   }),
   "debug.logFile": setting({
-    group: "performance",
-    label: "[placeholder copy: write engine logs to a file]",
-    hint: `[placeholder copy: appends what the engine is doing to ${ENGINE_LOG_FILE}, kept under 8 MB; off writes nothing]`,
+    group: "advanced",
+    label: "Enable logging",
+    hint: `Write internal logs to ${ENGINE_LOG_FILE_SHORT}`,
     schema: z.enum(["on", "off"]),
     default: "off",
     choices: onOff,

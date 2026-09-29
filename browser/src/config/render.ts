@@ -3,7 +3,6 @@ import type { SettingKey, Settings } from "./settings";
 export const AUTO = "auto";
 export const DISPLAY_FPS = "display";
 export const UNCAPPED = "uncapped";
-export const UNLIMITED = "unlimited";
 
 export function maxFps(value: string, displayHz: number): number {
   if (value === DISPLAY_FPS) return displayHz;
@@ -11,9 +10,6 @@ export function maxFps(value: string, displayHz: number): number {
   return Number(value);
 }
 
-export function frameBudgetMbps(value: string): number {
-  return value === UNLIMITED ? 0 : Number(value);
-}
 export function renderEnv(get: <K extends SettingKey>(key: K) => Settings[K]): Record<string, string> {
   const env: Record<string, string> = {};
   const presenter = get("render.presenter");

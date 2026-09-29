@@ -36,3 +36,5 @@ export {
 } from "./interop";
 export type { InteropInstance, OpenResult, OpenSpec, RegisteredApp } from "./interop";
 export { TERMINAL_SOCKET_ENV, TERMINAL_SOCKET_PROTOCOL, socketTerminal } from "./terminal-socket";
+export { fetchLatestRelease, installedByHomebrew, installedChannel, installedVersion, upgradeCommand } from "./release";
+export type { LatestRelease } from "./release";

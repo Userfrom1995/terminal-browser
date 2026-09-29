@@ -27,6 +27,7 @@ export interface LoadedConfig {
 export type ConfigFile = keyof ConfigFiles;
 
 const WATCH_SETTLE_MS = 150;
+const WATCH_POLL_MS = 1000;
 
 const jsonObject = z
   .string()
@@ -151,21 +152,54 @@ export class ConfigStore {
       pending.clear();
       if (changed.length) onChange(changed);
     };
-    const watchers = [...new Set(names.map((name) => path.dirname(this.files[name])))].map((dir) => {
+    const touch = (name: ConfigFile) => {
+      pending.add(name);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(settle, WATCH_SETTLE_MS);
+    };
+    // No single source is reliable on macOS: directory watches (FSEvents) can stop delivering
+    // on a long-running machine, file watches (kqueue) go stale when an editor replaces the file.
+    const dirWatchers = [...new Set(names.map((name) => path.dirname(this.files[name])))].map((dir) => {
       fs.mkdirSync(dir, { recursive: true });
       return fs.watch(dir, (_event, filename) => {
         for (const name of names) {
           if (path.dirname(this.files[name]) !== dir) continue;
           if (filename && filename !== path.basename(this.files[name])) continue;
-          pending.add(name);
+          touch(name);
         }
-        if (timer) clearTimeout(timer);
-        timer = setTimeout(settle, WATCH_SETTLE_MS);
       });
     });
+    const fileWatchers = new Map<ConfigFile, fs.FSWatcher>();
+    let stopped = false;
+    const watchFile = (name: ConfigFile) => {
+      fileWatchers.get(name)?.close();
+      fileWatchers.delete(name);
+      if (stopped) return;
+      try {
+        fileWatchers.set(
+          name,
+          fs.watch(this.files[name], (event) => {
+            touch(name);
+            if (event === "rename") setTimeout(() => watchFile(name), WATCH_SETTLE_MS);
+          }),
+        );
+      } catch {
+        // the file does not exist yet; the directory watch or the poll picks up its creation
+      }
+    };
+    for (const name of names) {
+      watchFile(name);
+      fs.watchFile(this.files[name], { interval: WATCH_POLL_MS, persistent: false }, () => {
+        touch(name);
+        if (!fileWatchers.has(name)) watchFile(name);
+      });
+    }
     return () => {
+      stopped = true;
       if (timer) clearTimeout(timer);
-      for (const watcher of watchers) watcher.close();
+      for (const watcher of dirWatchers) watcher.close();
+      for (const watcher of fileWatchers.values()) watcher.close();
+      for (const name of names) fs.unwatchFile(this.files[name]);
     };
   }
 

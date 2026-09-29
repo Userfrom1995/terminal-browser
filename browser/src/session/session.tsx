@@ -18,7 +18,7 @@ import type { Pane, Terminal } from "@zenbu-labs/pixel/terminal";
 import { bundledAsset } from "../assets";
 import { CopyOnSelect, Grab, reactGrabPreloadPath } from "../grab/grab";
 import { AgentPaneFinder } from "../grab/target";
-import { frameBudgetMbps, maxFps, renderEnv } from "../config/render";
+import { maxFps, renderEnv } from "../config/render";
 import { ENGINE_LOG_FILE } from "../config/settings";
 import type { EmbeddedAgent } from "../grab/target";
 import type { ZoomDirection } from "../zoom";
@@ -26,12 +26,16 @@ import {
   SHORTCUTS_FILE,
   SETTINGS_FILE,
   TERMINAL_SOCKET_ENV,
+  fetchLatestRelease,
+  installedChannel,
+  installedVersion,
   lastUrl,
   listApps,
   setLastUrl,
   settings as settingsTable,
   socketTerminal,
   store,
+  upgradeCommand,
 } from "pixel-store";
 import type { InstanceRow, RegisteredApp } from "pixel-store";
 
@@ -56,6 +60,7 @@ import type {
   TabActions,
   TabView,
   ToastView,
+  ReleaseView,
 } from "../ui/types";
 import { displayUrl, normalizeUrl, searchOrUrl, searchUrlFor } from "../url";
 import type { SearchUrl } from "../url";
@@ -185,12 +190,17 @@ class Session {
       settingsChanged: () => this.applyRenderSettings(),
       toast: (text, state) => this.showToast(text, state),
       setClipboard: (text) => this.root?.setClipboard(text),
-      openUrl: (url) => this.tabs.create(url),
       overlayOpened: () => this.enterOverlay([]),
       overlayClosed: () => this.leaveOverlay(),
+      release: () => this.release,
     },
     { settings: SETTINGS_FILE, shortcuts: SHORTCUTS_FILE },
   );
+  private readonly release: ReleaseView = {
+    version: installedVersion() ?? "dev",
+    latest: null,
+    upgrade: upgradeCommand(),
+  };
   private readonly tabs: TabManager;
   private readonly fallbackState: WebViewState;
 
@@ -237,6 +247,7 @@ class Session {
   private copyWatchers = new Map<number, CopyOnSelect>();
   private readonly copyOnSelect: boolean;
   private readonly grabIcon = bundledAsset(path.join("react-grab", "logo.png"));
+  private readonly inspectIcon = bundledAsset(path.join("chromium", "logo.png"));
   private readonly agentPanes: AgentPaneFinder;
   private shownRecord: RecordSession | null = null;
   private recordStarting = false;
@@ -314,6 +325,7 @@ class Session {
 
   async start(): Promise<void> {
     if (process.platform === "darwin") app.dock?.hide();
+    this.checkForUpdate();
     await this.loadDevtoolsSettings();
     if (!this.ctx.tty) process.stdout.write(`\x1b]2;${this.marker}\x07`);
     this.root = createRoot({
@@ -443,10 +455,10 @@ class Session {
         stdio: tty ? "ignore" : "inherit",
         env,
       });
-      child.on("error", () => this.showToast(`could not launch ${app.name}`, "failed"));
+      child.on("error", () => this.showToast(`Could not launch ${app.name}`, "failed"));
       child.unref();
     } catch {
-      this.showToast(`could not launch ${app.name}`, "failed");
+      this.showToast(`Could not launch ${app.name}`, "failed");
     }
   }
 
@@ -962,13 +974,13 @@ class Session {
     this.render();
     const exported = await this.root.stopProfile();
     if (!exported) {
-      this.showToast("nothing was recorded", "failed");
+      this.showToast("Nothing was recorded", "failed");
       return;
     }
     clipboard.writeText(exported);
     const root = this.root;
-    this.showToast("profile path copied to clipboard", "done", undefined, {
-      label: "view profile",
+    this.showToast("Profile path copied to clipboard", "done", undefined, {
+      label: "View profile",
       run: () => {
         this.toast = null;
         this.render();
@@ -977,15 +989,24 @@ class Session {
     });
   }
 
+  private checkForUpdate() {
+    if (this.release.version === "dev") return;
+    fetchLatestRelease(installedChannel(), AbortSignal.timeout(5000))
+      .then((latest) => {
+        if (latest.version === this.release.version) return;
+        this.release.latest = latest.version;
+        this.render();
+      })
+      .catch(() => {});
+  }
+
   private applyRenderSettings() {
     const root = this.root;
     if (!root) return;
     const render = {
       maxFps: maxFps(this.settings.get("render.fps"), displayHz()),
-      frameBudgetMbps: frameBudgetMbps(this.settings.get("render.bandwidth")),
       highlightTransmits: this.settings.get("render.transmitOutlines") === "on",
       frameEvents: this.settings.get("render.frameEvents") === "on",
-      compareFrames: this.settings.get("render.compareFrames") === "on",
     };
     root.setRender(render);
     root.setLogFile(this.settings.get("debug.logFile") === "on" ? ENGINE_LOG_FILE : null);
@@ -1153,7 +1174,7 @@ class Session {
     const watcher = new CopyOnSelect(handle, {
       copied: (text) => {
         this.root?.setClipboard(text);
-        this.showToast("copied to clipboard", "done");
+        this.showToast("Copied to clipboard", "done");
       },
     });
     this.copyWatchers.set(tab.id, watcher);
@@ -1191,7 +1212,7 @@ class Session {
     this.root?.setClipboard(content);
     try {
       const target = await this.agentPanes.send(content);
-      this.showToast(target ? "Sent to agent" : "copied to clipboard", "done");
+      this.showToast(target ? "Sent to agent" : "Copied to clipboard", "done");
     } catch (error) {
       this.showToast(error instanceof Error ? error.message : String(error), "failed");
     }
@@ -1200,7 +1221,7 @@ class Session {
   private grabMenuItem(): PageMenuItem {
     return {
       id: "grab",
-      label: this.activeGrab()?.active ? "stop selection" : "send to agent",
+      label: this.activeGrab()?.active ? "Stop selection" : "Send to agent",
       enabled: true,
       shortcut: this.keymap.label("grab.toggle"),
       icon: this.grabIcon ? { kind: "image", src: this.grabIcon } : undefined,
@@ -1212,16 +1233,17 @@ class Session {
       this.grabMenuItem(),
       {
         id: "record",
-        label: this.activeRecord() ? "complete recording" : "record",
+        label: this.activeRecord() ? "Complete recording" : "Record",
         enabled: true,
         shortcut: this.activeRecord() ? "" : this.keymap.label("record.toggle"),
-        icon: { kind: "path", d: ICONS.record, tint: "red", weight: 4.5 },
+        icon: { kind: "path", d: ICONS.record, tint: "red", weight: 8 },
       },
       {
         id: "inspect",
-        label: "inspect",
+        label: "Inspect",
         enabled: true,
         shortcut: this.keymap.label("devtools.toggle"),
+        icon: this.inspectIcon ? { kind: "image", src: this.inspectIcon } : undefined,
       },
     ];
   }
@@ -1249,7 +1271,7 @@ class Session {
         ? [
             {
               id: "copy",
-              label: "copy",
+              label: "Copy",
               enabled: true,
               shortcut: process.platform === "darwin" ? "cmd+c" : "ctrl+c",
             },
@@ -1257,8 +1279,8 @@ class Session {
         : []),
       ...(this.pageMenu.linkURL
         ? [
-            { id: "open-link-tab", label: "open link in new tab", enabled: true, shortcut: "" },
-            { id: "copy-link", label: "copy link address", enabled: true, shortcut: "" },
+            { id: "open-link-tab", label: "Open link in new tab", enabled: true, shortcut: "" },
+            { id: "copy-link", label: "Copy link address", enabled: true, shortcut: "" },
           ]
         : []),
       ...this.toolMenuItems(),
@@ -1417,15 +1439,15 @@ class Session {
         ? [
           {
             id: "profile",
-            label: this.profiling ? "stop profile" : "start profile",
+            label: this.profiling ? "Stop profile" : "Start profile",
             shortcut: "",
             run: () => void this.toggleProfile(),
           },
           {
             id: "highlight-transmits",
             label: this.root?.highlightTransmits()
-              ? "hide transmit outlines"
-              : "show transmit outlines",
+              ? "Hide transmit outlines"
+              : "Show transmit outlines",
             shortcut: "",
             run: () =>
               this.settings.actions.set(
@@ -1441,8 +1463,8 @@ class Session {
               id: "devtools-dock",
               label:
                 this.devtoolsDockSide === "bottom"
-                  ? "dock devtools right"
-                  : "dock devtools bottom",
+                  ? "Dock devtools right"
+                  : "Dock devtools bottom",
               shortcut: "",
               run: () =>
                 this.setDevtoolsDockSide(this.devtoolsDockSide === "bottom" ? "right" : "bottom"),
@@ -1453,7 +1475,7 @@ class Session {
         ? [
           {
             id: "dev-reload",
-            label: "reload instance",
+            label: "Reload instance",
             shortcut: "ctrl+shift+r",
             run: () => this.requestDevReload(this.ctx.env.TERMINAL_BROWSER_DEV_SOCKET!),
           },
@@ -1472,13 +1494,13 @@ class Session {
     switch (id) {
       case "record.toggle": {
         const record = this.activeRecord();
-        if (!record) return "record page";
-        return record.reviewing ? "complete recording" : "stop recording";
+        if (!record) return "Record page";
+        return record.reviewing ? "Complete recording" : "Stop recording";
       }
       case "grab.toggle":
-        return this.activeGrab()?.active ? "stop selection" : "send to agent";
+        return this.activeGrab()?.active ? "Stop selection" : "Send to agent";
       case "devtools.toggle":
-        return this.tabs.active?.devtools ? "close devtools" : "open devtools";
+        return this.tabs.active?.devtools ? "Close devtools" : "Open devtools";
       default:
         return commandLabel(id);
     }

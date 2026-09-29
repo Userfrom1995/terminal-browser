@@ -63,9 +63,9 @@ export interface PageMenuView {
   items: PageMenuItem[];
 }
 
-export type SettingGroup = "general" | "performance";
+export type SettingGroup = "general" | "advanced";
 
-export type SettingsSection = SettingGroup | "shortcuts" | "advanced";
+export type SettingsSection = SettingGroup | "shortcuts";
 
 export interface ShortcutRow {
   id: string;
@@ -85,12 +85,12 @@ export type SettingRow = {
   key: string;
   group: SettingGroup;
   label: string;
-  hint?: string;
-  link?: string;
+  hint: string;
   modified: boolean;
 } & (
   | { kind: "string"; value: string }
-  | { kind: "choice"; value: string; choices: SettingChoiceView[] }
+  | { kind: "toggle"; value: string }
+  | { kind: "choice"; value: string; choices: SettingChoiceView[]; custom: boolean }
 );
 
 export interface SettingsView {
@@ -100,6 +100,13 @@ export interface SettingsView {
   shortcuts: ShortcutRow[];
   settings: SettingRow[];
   files: { settings: string; shortcuts: string };
+  release: ReleaseView;
+}
+
+export interface ReleaseView {
+  version: string;
+  latest: string | null;
+  upgrade: string;
 }
 
 export interface SettingsActions {
@@ -116,7 +123,6 @@ export interface SettingsActions {
   reloadConfig(): void;
   copyAgentBrief(): void;
   copyPath(file: "settings" | "shortcuts"): void;
-  openLink(url: string): void;
 }
 
 export interface ChromeActions {

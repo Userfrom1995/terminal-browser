@@ -362,7 +362,7 @@ function ProfilingPill({ actions, rem, theme }: { actions: ChromeActions; rem: n
         }}
       />
       <Text style={{ fontSize: rem * 0.75, color: [255, 255, 255, 255], wrap: false, selectable: false }}>
-        profiling
+        Profiling
       </Text>
     </Box>
   );

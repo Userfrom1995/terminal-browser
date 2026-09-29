@@ -10,7 +10,7 @@ const { defaultKeys } = require("../dist/config/commands.js");
 const { searchUrlFor, searchOrUrl } = require("../dist/url.js");
 const { SEARCH_ENGINES, engineBySearch, parseSuggestions } = require("../dist/config/search.js");
 const { SettingsManager } = require("../dist/session/settings.js");
-const { renderEnv, maxFps, frameBudgetMbps } = require("../dist/config/render.js");
+const { renderEnv, maxFps } = require("../dist/config/render.js");
 
 const press = (key, mods = {}) => ({
   key,
@@ -209,6 +209,7 @@ function tempManager() {
     toast() {},
     overlayOpened() {},
     overlayClosed() {},
+    release: () => ({ version: "dev", latest: null, upgrade: "terminal-browser upgrade" }),
   };
   return { manager: new SettingsManager(host, store.files), store };
 }
@@ -277,22 +278,20 @@ test("render settings accept numbers or their named values and refuse the rest",
   const store = tempStore();
   fs.writeFileSync(
     store.files.settings,
-    JSON.stringify({ "render.fps": 60, "render.bandwidth": 10, "render.presenter": "patched" }),
+    JSON.stringify({ "render.fps": 60, "render.presenter": "patched" }),
   );
   const loaded = store.load();
   assert.deepEqual(loaded.errors, []);
   assert.equal(loaded.settings["render.fps"], "60");
-  assert.equal(loaded.settings["render.bandwidth"], "10");
   assert.equal(loaded.settings["render.presenter"], "patched");
 
   fs.writeFileSync(
     store.files.settings,
-    JSON.stringify({ "render.fps": "fast", "render.bandwidth": "lots", "render.transport": "usb" }),
+    JSON.stringify({ "render.fps": "fast", "render.transport": "usb" }),
   );
   const broken = store.load();
-  assert.equal(broken.errors.length, 3);
+  assert.equal(broken.errors.length, 2);
   assert.equal(broken.settings["render.fps"], "display");
-  assert.equal(broken.settings["render.bandwidth"], "3");
   assert.equal(broken.settings["render.transport"], "auto");
 });
 
@@ -300,8 +299,6 @@ test("render settings map to engine values and the startup env", () => {
   assert.equal(maxFps("display", 120), 120);
   assert.equal(maxFps("uncapped", 120), 0);
   assert.equal(maxFps("45", 120), 45);
-  assert.equal(frameBudgetMbps("unlimited"), 0);
-  assert.equal(frameBudgetMbps("2.5"), 2.5);
 
   const { manager } = tempManager();
   assert.deepEqual(renderEnv((key) => manager.get(key)), {});

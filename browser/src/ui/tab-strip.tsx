@@ -149,7 +149,7 @@ export function TabStrip({
   const pointerIn = useRef(false);
   const dotPulse = usePulse(tabs.some((tab) => tab.agentControlled && !tab.active));
   const label = (tab: TabRow) =>
-    tab.active ? activeLabel || tab.title || "new tab" : tab.title || "new tab";
+    tab.active ? activeLabel || tab.title || "New tab" : tab.title || "New tab";
   const charW = rem * 0.82 * 0.6;
   const slotW = rem * 0.85;
   const padX = rem * 0.7;

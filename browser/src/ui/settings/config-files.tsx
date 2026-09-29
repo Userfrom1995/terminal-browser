@@ -2,11 +2,11 @@ import { Box, Text } from "@zenbu-labs/pixel";
 import type { Theme } from "../theme";
 import type { SettingsActions, SettingsView } from "../types";
 import { copy } from "./copy";
-import { ScrollPane } from "./scroll-pane";
 import { TextButton } from "./controls";
 import { CopyIcon, useCopiedFlash } from "./copied";
+import { PANE_PADDING_REMS } from "./index";
 
-export function AdvancedPane({
+export function ConfigFiles({
   view,
   actions,
   rem,
@@ -18,26 +18,21 @@ export function AdvancedPane({
   theme: Theme;
 }) {
   return (
-    <ScrollPane
-      rem={rem}
-      resetKey={0}
+    <Box
       style={{
-        flexGrow: 1,
-        flexBasis: 0,
         flexDirection: "column",
-        gap: rem * 0.8,
-        padding: { top: rem * 0.9, bottom: rem * 0.8, left: rem * 1, right: rem * 1 },
+        gap: rem * 0.45,
+        padding: { top: rem * 1.1, left: rem * PANE_PADDING_REMS, right: rem * PANE_PADDING_REMS },
       }}
     >
+      <Text style={{ fontSize: rem * 1, wrap: false, selectable: false }}>{copy.configFiles}</Text>
       <PathLine
-        header={copy.files.settings}
         path={view.files.settings}
         rem={rem}
         theme={theme}
         onCopy={() => actions.copyPath("settings")}
       />
       <PathLine
-        header={copy.files.shortcuts}
         path={view.files.shortcuts}
         rem={rem}
         theme={theme}
@@ -46,18 +41,16 @@ export function AdvancedPane({
       <Box style={{ margin: { top: rem * 0.3 } }}>
         <TextButton label={copy.reload} rem={rem} theme={theme} onClick={actions.reloadConfig} />
       </Box>
-    </ScrollPane>
+    </Box>
   );
 }
 
 function PathLine({
-  header,
   path,
   rem,
   theme,
   onCopy,
 }: {
-  header: string;
   path: string;
   rem: number;
   theme: Theme;
@@ -65,16 +58,13 @@ function PathLine({
 }) {
   const [copied, flash] = useCopiedFlash();
   return (
-    <Box style={{ flexDirection: "column", gap: rem * 0.25 }}>
-      <Text style={{ fontSize: rem * 0.75, color: theme.muted, wrap: false, selectable: false }}>
-        {header}
-      </Text>
-      <Box style={{ alignItems: "center", gap: rem * 0.4 }}>
-        <Text style={{ fontSize: rem * 0.85, wrap: false }}>{path}</Text>
+    <Box style={{ flexDirection: "column" }}>
+      <Box style={{ alignItems: "center", gap: rem * 0.5 }}>
+        <Text style={{ fontSize: rem * 0.85, color: theme.muted, wrap: false }}>{path}</Text>
         <Box
           style={{
-            width: rem * 1.3,
-            height: rem * 1.3,
+            width: rem * 1.6,
+            height: rem * 1.6,
             alignItems: "center",
             justifyContent: "center",
             cornerRadius: rem * 0.3,
@@ -85,7 +75,7 @@ function PathLine({
             flash();
           }}
         >
-          <CopyIcon copied={copied} size={rem * 0.8} theme={theme} />
+          <CopyIcon copied={copied} size={rem * 1} theme={theme} />
         </Box>
       </Box>
     </Box>
