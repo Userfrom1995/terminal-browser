@@ -18,8 +18,8 @@ importers:
   browser:
     dependencies:
       '@zenbu-labs/pixel':
-        specifier: 0.0.16
-        version: 0.0.16(react@18.3.1)
+        specifier: 0.0.18
+        version: 0.0.18(react@18.3.1)
       micromark:
         specifier: ^4.0.2
         version: 4.0.2
@@ -52,8 +52,8 @@ importers:
   cli:
     dependencies:
       '@zenbu-labs/pixel':
-        specifier: 0.0.16
-        version: 0.0.16(react@18.3.1)
+        specifier: 0.0.18
+        version: 0.0.18(react@18.3.1)
       pixel-store:
         specifier: workspace:*
         version: link:../store
@@ -71,8 +71,8 @@ importers:
   monitor:
     dependencies:
       '@zenbu-labs/pixel':
-        specifier: 0.0.16
-        version: 0.0.16(react@18.3.1)
+        specifier: 0.0.18
+        version: 0.0.18(react@18.3.1)
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -100,8 +100,8 @@ importers:
         specifier: ^22.0.0
         version: 22.20.1
       '@zenbu-labs/pixel':
-        specifier: 0.0.16
-        version: 0.0.16(react@18.3.1)
+        specifier: 0.0.18
+        version: 0.0.18(react@18.3.1)
       drizzle-kit:
         specifier: 0.31.5
         version: 0.31.5
@@ -603,28 +603,28 @@ packages:
     resolution: {integrity: sha512-5AXjrcMClTryPe9LgZrygpB1lj7s0S9E0+W+AHaVKAVyHanafK86iPSvG5xHVSp/jC+VH1UXu0TAEmY279xH7A==}
     engines: {node: '>=14.6'}
 
-  '@zenbu-labs/pixel-native-darwin-arm64@0.0.16':
-    resolution: {integrity: sha512-l47WeT0VWHNzAaQkTNKA2IqVpibTdH5NXmMjJpyt0Y7CaGegMz6ScNht5sPlref3Gtr2IWGqsZn2QZaltUbfPg==}
+  '@zenbu-labs/pixel-native-darwin-arm64@0.0.18':
+    resolution: {integrity: sha512-9PV4tkbFzLpgt41qL9rMu+iNKf9CcSuvIK1EtZrOmcqIfXRJl2O9WihD45h7g0Frrb2Yw/cqgeWgjw2ReO6Qmw==}
     cpu: [arm64]
     os: [darwin]
 
-  '@zenbu-labs/pixel-native-darwin-x64@0.0.16':
-    resolution: {integrity: sha512-kl0wjFI0bI2X4BuVn49Kax57Dn3LFhS0pSAznaZmMiEdBv8AdveCi0Dy4mRqzMNJHPKLG6UtLOdmepFwoIxvyw==}
+  '@zenbu-labs/pixel-native-darwin-x64@0.0.18':
+    resolution: {integrity: sha512-JaRwM52hXr1aHO8nu2Lov8aar1rxK+DSXqT0O8XgtXqUxaf9q10xjYS0c1YVNq3wrwFVEh52/d3A7QPa4dftLw==}
     cpu: [x64]
     os: [darwin]
 
-  '@zenbu-labs/pixel-native-linux-arm64@0.0.16':
-    resolution: {integrity: sha512-NHiiSW7AHgipJEPHn8SoHIRuSfCLOsILs+42V20LtpEIb7vYX8vGkOfSXUYYpI99VlGV3pzKk/0kcVBqArcxLw==}
+  '@zenbu-labs/pixel-native-linux-arm64@0.0.18':
+    resolution: {integrity: sha512-7o0r42T6c8c3kfT/H3+iMnWmxWZTc9sroIdyIl22oODhbIgg50+npZ00W8URwDrBy0qXUauOiyqXFUtjydm/kA==}
     cpu: [arm64]
     os: [linux]
 
-  '@zenbu-labs/pixel-native-linux-x64@0.0.16':
-    resolution: {integrity: sha512-vLvRzvmcar2PNo304cU1+Ibp6M9niElUAVDNLifH5UWNxm+vebS9UeJNcyLALL8lgQz6kkMA7cRjH1v08EnLTw==}
+  '@zenbu-labs/pixel-native-linux-x64@0.0.18':
+    resolution: {integrity: sha512-5h5qHI8UqSDxaNp+JP2nf4eRh+flsifpkEOc325kMS0ZzZZndzC5Yh/P0+NcDeK/RhBWrHKBdETuqARCD6ff4w==}
     cpu: [x64]
     os: [linux]
 
-  '@zenbu-labs/pixel@0.0.16':
-    resolution: {integrity: sha512-lmu4EhldoMKskl0bFfI69Kd7Td4ODNICNtiD+St0/jd3YMGBWT5a7D3jRABq9IQQfIxHyevk7bseOfSRfJr4FQ==}
+  '@zenbu-labs/pixel@0.0.18':
+    resolution: {integrity: sha512-c9zsfXh720GYwNORBUtJo6B+o7aB3bzXIwXwGic8pGlePrT0VVoC66BAUCzIjOBEyGBXM2jv3CGB8+yEitwe9Q==}
     hasBin: true
     peerDependencies:
       react: ^18.3.1
@@ -1478,27 +1478,27 @@ snapshots:
 
   '@xmldom/xmldom@0.9.12': {}
 
-  '@zenbu-labs/pixel-native-darwin-arm64@0.0.16':
+  '@zenbu-labs/pixel-native-darwin-arm64@0.0.18':
     optional: true
 
-  '@zenbu-labs/pixel-native-darwin-x64@0.0.16':
+  '@zenbu-labs/pixel-native-darwin-x64@0.0.18':
     optional: true
 
-  '@zenbu-labs/pixel-native-linux-arm64@0.0.16':
+  '@zenbu-labs/pixel-native-linux-arm64@0.0.18':
     optional: true
 
-  '@zenbu-labs/pixel-native-linux-x64@0.0.16':
+  '@zenbu-labs/pixel-native-linux-x64@0.0.18':
     optional: true
 
-  '@zenbu-labs/pixel@0.0.16(react@18.3.1)':
+  '@zenbu-labs/pixel@0.0.18(react@18.3.1)':
     dependencies:
       react: 18.3.1
       react-reconciler: 0.29.2(react@18.3.1)
     optionalDependencies:
-      '@zenbu-labs/pixel-native-darwin-arm64': 0.0.16
-      '@zenbu-labs/pixel-native-darwin-x64': 0.0.16
-      '@zenbu-labs/pixel-native-linux-arm64': 0.0.16
-      '@zenbu-labs/pixel-native-linux-x64': 0.0.16
+      '@zenbu-labs/pixel-native-darwin-arm64': 0.0.18
+      '@zenbu-labs/pixel-native-darwin-x64': 0.0.18
+      '@zenbu-labs/pixel-native-linux-arm64': 0.0.18
+      '@zenbu-labs/pixel-native-linux-x64': 0.0.18
 
   agent-install@0.0.6:
     dependencies:
