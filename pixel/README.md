@@ -10,8 +10,8 @@ A library for building graphical applications that can run in the terminal
 - Built in devtools (element inspector, profiler, log viewer)
 
 ## Projects using pixel
-- [terminal-browser](https://github.com/zenbu-labs/terminal-browser) 3k ⭐'s  - a browser inside the terminal
-- [terminal-code](https://github.com/zenbu-labs/terminal-code) 2k ⭐'s - vscode inside the terminal
+- [terminal-browser](https://github.com/zenbu-labs/terminal-browser) - a browser inside the terminal
+- [terminal-code](https://github.com/zenbu-labs/terminal-code) - vscode inside the terminal
 
 
 ## Documentation
