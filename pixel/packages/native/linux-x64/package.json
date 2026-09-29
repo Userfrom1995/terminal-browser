@@ -1,12 +1,12 @@
 {
   "name": "@zenbu-labs/pixel-native-linux-x64",
-  "version": "0.0.2",
+  "version": "0.0.20",
   "description": "[placeholder copy: prebuilt engine binary for pixel on linux-x64]",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zenbu-labs/pixel.git",
-    "directory": "packages/native/linux-x64"
+    "url": "git+https://github.com/zenbu-labs/terminal-browser.git",
+    "directory": "pixel/packages/native/linux-x64"
   },
   "os": [
     "linux"

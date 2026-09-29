@@ -1,5 +1,0 @@
-packages:
-  - packages/*
-  - packages/native/*
-  - examples/*
-linkWorkspacePackages: true

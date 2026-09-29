@@ -18,8 +18,8 @@ importers:
   browser:
     dependencies:
       '@zenbu-labs/pixel':
-        specifier: 0.0.20
-        version: 0.0.20(react@18.3.1)
+        specifier: workspace:*
+        version: link:../pixel/packages/pixel
       micromark:
         specifier: ^4.0.2
         version: 4.0.2
@@ -52,8 +52,8 @@ importers:
   cli:
     dependencies:
       '@zenbu-labs/pixel':
-        specifier: 0.0.20
-        version: 0.0.20(react@18.3.1)
+        specifier: workspace:*
+        version: link:../pixel/packages/pixel
       pixel-store:
         specifier: workspace:*
         version: link:../store
@@ -71,8 +71,8 @@ importers:
   monitor:
     dependencies:
       '@zenbu-labs/pixel':
-        specifier: 0.0.20
-        version: 0.0.20(react@18.3.1)
+        specifier: workspace:*
+        version: link:../pixel/packages/pixel
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -87,6 +87,166 @@ importers:
         specifier: ^5.5.0
         version: 5.9.3
 
+  pixel/examples/composed:
+    dependencies:
+      '@zenbu-labs/pixel':
+        specifier: workspace:*
+        version: link:../../packages/pixel
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+      '@types/react':
+        specifier: ^18.3.0
+        version: 18.3.31
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+
+  pixel/examples/daemon:
+    dependencies:
+      '@zenbu-labs/pixel':
+        specifier: workspace:*
+        version: link:../../packages/pixel
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+      '@types/react':
+        specifier: ^18.3.0
+        version: 18.3.31
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+
+  pixel/examples/geometry-debug:
+    dependencies:
+      '@zenbu-labs/pixel':
+        specifier: workspace:*
+        version: link:../../packages/pixel
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+      '@types/react':
+        specifier: ^18.3.0
+        version: 18.3.31
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+
+  pixel/examples/hello:
+    dependencies:
+      '@zenbu-labs/pixel':
+        specifier: workspace:*
+        version: link:../../packages/pixel
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+
+  pixel/examples/ssh:
+    dependencies:
+      '@zenbu-labs/pixel':
+        specifier: workspace:*
+        version: link:../../packages/pixel
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+      '@types/react':
+        specifier: ^18.3.0
+        version: 18.3.31
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+
+  pixel/examples/transparent:
+    dependencies:
+      '@zenbu-labs/pixel':
+        specifier: workspace:*
+        version: link:../../packages/pixel
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+      '@types/react':
+        specifier: ^18.3.0
+        version: 18.3.31
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+
+  pixel/examples/tui-host-ts:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+
+  pixel/packages/native/darwin-arm64: {}
+
+  pixel/packages/native/darwin-x64: {}
+
+  pixel/packages/native/linux-arm64: {}
+
+  pixel/packages/native/linux-x64: {}
+
+  pixel/packages/pixel:
+    dependencies:
+      react-reconciler:
+        specifier: ^0.29.2
+        version: 0.29.2(react@18.3.1)
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+      '@types/react':
+        specifier: ^18.3.0
+        version: 18.3.31
+      '@types/react-reconciler':
+        specifier: ^0.28.8
+        version: 0.28.9(@types/react@18.3.31)
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+    optionalDependencies:
+      '@zenbu-labs/pixel-native-darwin-arm64':
+        specifier: 0.0.20
+        version: link:../native/darwin-arm64
+      '@zenbu-labs/pixel-native-darwin-x64':
+        specifier: 0.0.20
+        version: link:../native/darwin-x64
+      '@zenbu-labs/pixel-native-linux-arm64':
+        specifier: 0.0.20
+        version: link:../native/linux-arm64
+      '@zenbu-labs/pixel-native-linux-x64':
+        specifier: 0.0.20
+        version: link:../native/linux-x64
+
   store:
     dependencies:
       drizzle-orm:
@@ -100,8 +260,8 @@ importers:
         specifier: ^22.0.0
         version: 22.20.1
       '@zenbu-labs/pixel':
-        specifier: 0.0.20
-        version: 0.0.20(react@18.3.1)
+        specifier: workspace:*
+        version: link:../pixel/packages/pixel
       drizzle-kit:
         specifier: 0.31.5
         version: 0.31.5
@@ -596,38 +756,17 @@ packages:
   '@types/prop-types@15.7.15':
     resolution: {integrity: sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==}
 
+  '@types/react-reconciler@0.28.9':
+    resolution: {integrity: sha512-HHM3nxyUZ3zAylX8ZEyrDNd2XZOnQ0D5XfunJF5FLQnZbHHYq4UWvW1QfelQNXv1ICNkwYhfxjwfnqivYB6bFg==}
+    peerDependencies:
+      '@types/react': '*'
+
   '@types/react@18.3.31':
     resolution: {integrity: sha512-vfEqpXTvwT91yhmwdfouStN2hSKwTvyRs8qpLfADyrq/kxDw0hZM7Wk9Ug1FELj8hIby+S/+kQCSRFF32nv2Qw==}
 
   '@xmldom/xmldom@0.9.12':
     resolution: {integrity: sha512-5AXjrcMClTryPe9LgZrygpB1lj7s0S9E0+W+AHaVKAVyHanafK86iPSvG5xHVSp/jC+VH1UXu0TAEmY279xH7A==}
     engines: {node: '>=14.6'}
-
-  '@zenbu-labs/pixel-native-darwin-arm64@0.0.20':
-    resolution: {integrity: sha512-fdC7Clgl3UvNIP5sW7QmnFPReclq2AA5xt/xTFsuIPvzKRlRnOjJ8l7My4cquw6CMXL/mU/+hnPXLPwZm1lKxg==}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@zenbu-labs/pixel-native-darwin-x64@0.0.20':
-    resolution: {integrity: sha512-nhSgwHF+lbP4ROtoePcDNJX2WVYmer1F/pvN/ezISi2XCEkiCgzADfULavDVnhu2S5k3XThqAUUyaRTiqNSCug==}
-    cpu: [x64]
-    os: [darwin]
-
-  '@zenbu-labs/pixel-native-linux-arm64@0.0.20':
-    resolution: {integrity: sha512-SZBkH/QalkxLIdOrQyalS6mnwznrahcZhq0z2DUvNFDeCp7zZEu1wE0NAyahRF6Z0C6Da7XUZiNmL3ap4xGOTA==}
-    cpu: [arm64]
-    os: [linux]
-
-  '@zenbu-labs/pixel-native-linux-x64@0.0.20':
-    resolution: {integrity: sha512-CnH7U6NGO+4OKuvuH8xHFTFQrHNocNgYHzVnL6D4BD1o0z1sk2H54c4ac7leg7EEjes8u7Iu4Zf4EUe+5sBetg==}
-    cpu: [x64]
-    os: [linux]
-
-  '@zenbu-labs/pixel@0.0.20':
-    resolution: {integrity: sha512-eJaki2FLzOxPjZCsbSdnYSnOCe8VZ/9dhwwbUKKgBQM6A9K2V7Znd37ZwdbzQT63IvzW3Nx20Mdvz1EaDhXr8Q==}
-    hasBin: true
-    peerDependencies:
-      react: ^18.3.1
 
   agent-install@0.0.6:
     resolution: {integrity: sha512-7NRMZ/ZDz2vHevQTgJsocBFpakB1/Wx5ip19YSJuj4VOXpraWztTerViNtdSyARKZT9e2yVwUUB5JXXCE7mNrA==}
@@ -1471,34 +1610,16 @@ snapshots:
 
   '@types/prop-types@15.7.15': {}
 
+  '@types/react-reconciler@0.28.9(@types/react@18.3.31)':
+    dependencies:
+      '@types/react': 18.3.31
+
   '@types/react@18.3.31':
     dependencies:
       '@types/prop-types': 15.7.15
       csstype: 3.2.3
 
   '@xmldom/xmldom@0.9.12': {}
-
-  '@zenbu-labs/pixel-native-darwin-arm64@0.0.20':
-    optional: true
-
-  '@zenbu-labs/pixel-native-darwin-x64@0.0.20':
-    optional: true
-
-  '@zenbu-labs/pixel-native-linux-arm64@0.0.20':
-    optional: true
-
-  '@zenbu-labs/pixel-native-linux-x64@0.0.20':
-    optional: true
-
-  '@zenbu-labs/pixel@0.0.20(react@18.3.1)':
-    dependencies:
-      react: 18.3.1
-      react-reconciler: 0.29.2(react@18.3.1)
-    optionalDependencies:
-      '@zenbu-labs/pixel-native-darwin-arm64': 0.0.20
-      '@zenbu-labs/pixel-native-darwin-x64': 0.0.20
-      '@zenbu-labs/pixel-native-linux-arm64': 0.0.20
-      '@zenbu-labs/pixel-native-linux-x64': 0.0.20
 
   agent-install@0.0.6:
     dependencies:

@@ -1,14 +1,16 @@
-name: release
+name: pixel release
 
-# One button: run this workflow with a bump and it tags the next version, builds
-# the engine on every platform, and publishes all five packages to npm through
-# npm's trusted publishing (OIDC), so no npm token lives in this repo. Pushing a
-# v* tag by hand does the same without the bump.
+# Releases the pixel packages that live under pixel/. One button: run this workflow with a
+# bump and it tags pixel-v<next>, builds the engine on every platform, and publishes all five
+# packages to npm through npm's trusted publishing (OIDC). Pushing a pixel-v* tag by hand does
+# the same without the bump. terminal-browser's own releases are the plain v* tags.
 on:
   push:
     branches: [main]
-    tags: ["v*"]
+    tags: ["pixel-v*"]
+    paths: ["pixel/**", ".github/workflows/pixel-release.yml"]
   pull_request:
+    paths: ["pixel/**", ".github/workflows/pixel-release.yml"]
   workflow_dispatch:
     inputs:
       bump:
@@ -21,7 +23,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.event_name == 'workflow_dispatch' && 'cut' || github.ref }}
+  group: pixel-release-${{ github.event_name == 'workflow_dispatch' && 'cut' || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -39,15 +41,15 @@ jobs:
           fetch-depth: 0
       - id: v
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            VERSION="${GITHUB_REF#refs/tags/v}"
+          if [[ "$GITHUB_REF" == refs/tags/pixel-v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/pixel-v}"
             echo "ref=$GITHUB_REF" >> "$GITHUB_OUTPUT"
             echo "release=true" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event_name }}" = workflow_dispatch ]; then
-            TAG="$(scripts/next-version.sh "${{ inputs.bump }}")"
-            VERSION="${TAG#v}"
+            TAG="$(pixel/scripts/next-version.sh "${{ inputs.bump }}")"
+            VERSION="${TAG#pixel-v}"
             git -c user.name="pixel release" -c user.email="release@zenbu.dev" \
-              tag -a "$TAG" -m "pixel $TAG"
+              tag -a "$TAG" -m "pixel ${TAG#pixel-}"
             git push origin "$TAG"
             echo "ref=refs/tags/$TAG" >> "$GITHUB_OUTPUT"
             echo "release=true" >> "$GITHUB_OUTPUT"
@@ -72,10 +74,10 @@ jobs:
           cache: pnpm
       - run: PIXEL_SKIP_DOWNLOAD=1 pnpm install --frozen-lockfile
       - run: pnpm --filter @zenbu-labs/pixel build
-      - run: pnpm -r typecheck
+      - run: pnpm --filter './pixel/**' typecheck
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo check --workspace --all-targets
-        working-directory: engine
+        working-directory: pixel/engine
 
   native:
     needs: prepare
@@ -106,17 +108,17 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: engine
+          workspaces: pixel/engine
       - run: node scripts/build-native.mjs --release
-        working-directory: packages/pixel
+        working-directory: pixel/packages/pixel
       - if: matrix.container
-        run: objdump -T packages/native/${{ matrix.platform }}/pixel.node | grep -oE 'GLIBC_[0-9.]+' | sort -Vu | tail -1 | grep -qx GLIBC_2.28
+        run: objdump -T pixel/packages/native/${{ matrix.platform }}/pixel.node | grep -oE 'GLIBC_[0-9.]+' | sort -Vu | tail -1 | grep -qx GLIBC_2.28
       - uses: actions/upload-artifact@v4
         with:
           name: native-${{ matrix.platform }}
           path: |
-            packages/native/${{ matrix.platform }}/pixel.node
-            packages/native/${{ matrix.platform }}/native-scroll-helper
+            pixel/packages/native/${{ matrix.platform }}/pixel.node
+            pixel/packages/native/${{ matrix.platform }}/native-scroll-helper
           if-no-files-found: error
 
   publish:
@@ -145,33 +147,33 @@ jobs:
         run: |
           for dir in artifacts/native-*; do
             platform="${dir#artifacts/native-}"
-            cp "$dir"/* "packages/native/$platform/"
+            cp "$dir"/* "pixel/packages/native/$platform/"
           done
-          chmod +x packages/native/darwin-*/native-scroll-helper
+          chmod +x pixel/packages/native/darwin-*/native-scroll-helper
       - run: PIXEL_SKIP_DOWNLOAD=1 pnpm install --frozen-lockfile
       - run: pnpm --filter @zenbu-labs/pixel build
       - name: Stamp versions from the tag
         run: |
           VERSION="${{ needs.prepare.outputs.version }}"
-          for pkg in packages/native/* packages/pixel; do
+          for pkg in pixel/packages/native/* pixel/packages/pixel; do
             (cd "$pkg" && npm version "$VERSION" --no-git-tag-version --allow-same-version)
           done
           node -e '
             const fs = require("fs");
-            const file = "packages/pixel/package.json";
+            const file = "pixel/packages/pixel/package.json";
             const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
             for (const name of Object.keys(pkg.optionalDependencies)) pkg.optionalDependencies[name] = process.argv[1];
             fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");
           ' "$VERSION"
       - name: Publish
         run: |
-          for pkg in packages/native/*; do
+          for pkg in pixel/packages/native/*; do
             (cd "$pkg" && npm publish --access public --provenance)
           done
-          (cd packages/pixel && npm publish --access public --provenance)
+          (cd pixel/packages/pixel && npm publish --access public --provenance)
       - name: GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v${{ needs.prepare.outputs.version }}" -R "$GITHUB_REPOSITORY" \
-            --title "pixel v${{ needs.prepare.outputs.version }}" --generate-notes
+          gh release create "pixel-v${{ needs.prepare.outputs.version }}" -R "$GITHUB_REPOSITORY" \
+            --title "pixel v${{ needs.prepare.outputs.version }}" --notes "pixel ${{ needs.prepare.outputs.version }}, published to npm as @zenbu-labs/pixel"

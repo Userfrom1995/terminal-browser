@@ -1,4 +1,4 @@
-name: electron build
+name: pixel electron build
 run-name: "build patched electron v${{ inputs.version }}"
 
 on:
@@ -20,8 +20,8 @@ concurrency:
   group: electron-build-${{ inputs.version }}
   cancel-in-progress: false
 
-# Releases are tagged electron-v<version> so they never collide with this
-# package's own v<version> tags.
+# Releases are tagged electron-v<version> so they never collide with the pixel-v<version>
+# tags of the pixel packages or terminal-browser's own v<version> tags.
 jobs:
   plan:
     runs-on: ubuntu-latest
@@ -70,7 +70,7 @@ jobs:
           set -euo pipefail
           sudo xcode-select -p 2>/dev/null || true
           export ELECTRON_BUILD_DIR="$RUNNER_TEMP/electron-build"
-          bash electron/scripts/build.sh "${{ inputs.version }}" \
+          bash pixel/electron/scripts/build.sh "${{ inputs.version }}" \
             "$RUNNER_TEMP/out" "${{ matrix.platform }}"
           mv "$RUNNER_TEMP/out/SHASUMS256.txt" \
             "$RUNNER_TEMP/out/sha-${{ matrix.platform }}.txt"
@@ -128,7 +128,7 @@ jobs:
           cat sha-*.txt | sort -u > new.txt
           notes="Patched Electron v$version for pixel.
 
-          Patches (source of truth: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/main/electron/patches):
+          Patches (source of truth: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/main/pixel/electron/patches):
           - macOS: offscreen-rendering compositors ride a real display link, so page frame rates follow \`webContents.setFrameRate\` instead of being clamped to 60fps on input.
           - Linux: offscreen frames can be delivered through shared memory, and offscreen views keep their requested \`deviceScaleFactor\` on native Wayland instead of having it clobbered to 1.0.
           - \`electron.d.ts\` is generated from the patched API docs, so it types these additions.

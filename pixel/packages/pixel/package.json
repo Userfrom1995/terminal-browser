@@ -1,12 +1,12 @@
 {
   "name": "@zenbu-labs/pixel",
-  "version": "0.0.2",
+  "version": "0.0.20",
   "description": "[placeholder copy: Electron apps that render into your terminal pane]",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zenbu-labs/pixel.git",
-    "directory": "packages/pixel"
+    "url": "git+https://github.com/zenbu-labs/terminal-browser.git",
+    "directory": "pixel/packages/pixel"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -58,10 +58,10 @@
     "react": "^18.3.1"
   },
   "optionalDependencies": {
-    "@zenbu-labs/pixel-native-darwin-arm64": "0.0.2",
-    "@zenbu-labs/pixel-native-darwin-x64": "0.0.2",
-    "@zenbu-labs/pixel-native-linux-arm64": "0.0.2",
-    "@zenbu-labs/pixel-native-linux-x64": "0.0.2"
+    "@zenbu-labs/pixel-native-darwin-arm64": "0.0.20",
+    "@zenbu-labs/pixel-native-darwin-x64": "0.0.20",
+    "@zenbu-labs/pixel-native-linux-arm64": "0.0.20",
+    "@zenbu-labs/pixel-native-linux-x64": "0.0.20"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

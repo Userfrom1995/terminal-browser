@@ -25,9 +25,15 @@ if (!platform) {
   process.exit(1);
 }
 
-const mirror =
-  process.env.PIXEL_ELECTRON_MIRROR ??
-  `https://github.com/zenbu-labs/pixel/releases/download/electron-v${version}`;
+// Patched electron builds are published as electron-v<version> releases. Newer ones live on
+// the terminal-browser repo, where pixel now lives; older ones stayed on the archived pixel repo.
+const mirrors = process.env.PIXEL_ELECTRON_MIRROR
+  ? [process.env.PIXEL_ELECTRON_MIRROR]
+  : [
+      `https://github.com/zenbu-labs/terminal-browser/releases/download/electron-v${version}`,
+      `https://github.com/zenbu-labs/pixel/releases/download/electron-v${version}`,
+    ];
+let mirror = mirrors[0];
 const zipName = `electron-v${version}-${platform}.zip`;
 
 async function fetchBytes(url) {
@@ -59,9 +65,18 @@ function readMarker(file) {
 fs.mkdirSync(electronDir, { recursive: true });
 
 let shasums;
-try {
-  shasums = (await fetchBytes(`${mirror}/SHASUMS256.txt`)).toString("utf8");
-} catch (error) {
+let lastError;
+for (const candidate of mirrors) {
+  try {
+    shasums = (await fetchBytes(`${candidate}/SHASUMS256.txt`)).toString("utf8");
+    mirror = candidate;
+    break;
+  } catch (error) {
+    lastError = error;
+  }
+}
+if (!shasums) {
+  const error = lastError;
   if (skipBinary && fs.existsSync(typesFile)) process.exit(0);
   process.stderr.write(
     `pixel: [placeholder copy: no patched electron v${version} is published (${error.message}). ` +

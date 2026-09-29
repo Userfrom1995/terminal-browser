@@ -1,4 +1,4 @@
-name: electron sync
+name: pixel electron sync
 run-name: "sync with upstream electron releases"
 
 on:
@@ -28,8 +28,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          min_version=$(jq -r .minimum_version electron/config.json)
-          supported_majors=$(jq -r .supported_majors electron/config.json)
+          min_version=$(jq -r .minimum_version pixel/electron/config.json)
+          supported_majors=$(jq -r .supported_majors pixel/electron/config.json)
 
           if [ -n "$FORCED_VERSION" ]; then
             candidates="$FORCED_VERSION"
@@ -52,7 +52,7 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[].tag_name' \
             | sed -n 's/^electron-v//p' > published.txt || true
           gh issue list -R "$GITHUB_REPOSITORY" --state open --json title --jq '.[].title' > open-issues.txt || true
-          gh run list -R "$GITHUB_REPOSITORY" --workflow electron-build.yml --json displayTitle,status \
+          gh run list -R "$GITHUB_REPOSITORY" --workflow pixel-electron-build.yml --json displayTitle,status \
             --jq '.[] | select(.status=="queued" or .status=="in_progress") | .displayTitle' > active-builds.txt || true
 
           conflicts=0
@@ -71,9 +71,9 @@ jobs:
             fi
 
             echo "v$version: checking patches"
-            if bash electron/scripts/check-patches.sh "$version"; then
+            if bash pixel/electron/scripts/check-patches.sh "$version"; then
               echo "v$version: dispatching build"
-              gh workflow run electron-build.yml -R "$GITHUB_REPOSITORY" -f "version=$version"
+              gh workflow run pixel-electron-build.yml -R "$GITHUB_REPOSITORY" -f "version=$version"
             else
               conflicts=1
               title="🚨 Patch conflict: electron v$version"
