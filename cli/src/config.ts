@@ -101,6 +101,14 @@ function unset(store: ConfigStore, key: string): number {
 }
 
 export function configCommand(args: string[]): number {
+  try {
+    return run(args);
+  } catch (error) {
+    return complain(error instanceof Error ? error.message : String(error));
+  }
+}
+
+function run(args: string[]): number {
   const store = new ConfigStore({ settings: SETTINGS_FILE, shortcuts: SHORTCUTS_FILE });
   const [action, key, ...rest] = args;
   switch (action) {

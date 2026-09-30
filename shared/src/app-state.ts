@@ -42,6 +42,14 @@ export function setLastSeenVersion(version: string): void {
   setAppState("last-seen-version", version);
 }
 
+export function lastLaunchDay(): string | null {
+  return getAppState("last-launch-day");
+}
+
+export function setLastLaunchDay(day: string): void {
+  setAppState("last-launch-day", day);
+}
+
 export function lastActiveDay(): string | null {
   return getAppState("last-active-day");
 }

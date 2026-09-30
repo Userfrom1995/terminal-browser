@@ -6,8 +6,10 @@ import {
   anonymousId,
   installedChannel,
   lastActiveDay,
+  lastLaunchDay,
   lastSeenVersion,
   setLastActiveDay,
+  setLastLaunchDay,
   setLastSeenVersion,
 } from "shared";
 
@@ -56,8 +58,12 @@ export class Telemetry {
       const previous = lastSeenVersion();
       const version = this.options.version;
       if (previous !== version) setLastSeenVersion(version);
-      void this.send("app_launched", { first_launch: previous === null });
+      if (!this.allowed("usage")) return;
       if (previous && previous !== version) void this.send("app_upgraded", { from_version: previous });
+      const day = today();
+      if (lastLaunchDay() === day) return;
+      setLastLaunchDay(day);
+      void this.send("app_launched", { first_launch: previous === null });
     } catch {}
   }
 
@@ -73,18 +79,22 @@ export class Telemetry {
   }
 
   crashed(error: unknown, source: CrashSource): Promise<void> {
-    if (!this.allowed("crash")) return Promise.resolve();
-    const type = errorType(error);
-    return this.send(
-      "$exception",
-      {
-        source,
-        $exception_level: source === "uncaughtException" ? "fatal" : "error",
-        $exception_fingerprint: type,
-        $exception_list: [{ type, value: type, mechanism: { handled: false, synthetic: false } }],
-      },
-      "crash",
-    );
+    try {
+      if (!this.allowed("crash")) return Promise.resolve();
+      const type = errorType(error);
+      return this.send(
+        "$exception",
+        {
+          source,
+          $exception_level: source === "uncaughtException" ? "fatal" : "error",
+          $exception_fingerprint: type,
+          $exception_list: [{ type, value: type, mechanism: { handled: false, synthetic: false } }],
+        },
+        "crash",
+      );
+    } catch {
+      return Promise.resolve();
+    }
   }
 
   private allowed(kind: "usage" | "crash"): boolean {

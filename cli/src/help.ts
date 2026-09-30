@@ -136,6 +136,7 @@ Examples:
   terminal-browser config list
   terminal-browser config get search.engine
   terminal-browser config set telemetry.usage off
+  terminal-browser config set updates.check off
   terminal-browser config set shortcuts.tab.new "cmd+t,ctrl+t"
   terminal-browser config set shortcuts.record.toggle none
   terminal-browser config unset render.fps

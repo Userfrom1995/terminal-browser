@@ -1006,7 +1006,7 @@ class Session {
   }
 
   private checkForUpdate() {
-    if (this.release.version === "dev") return;
+    if (this.release.version === "dev" || this.settings.get("updates.check") === "off") return;
     fetchLatestRelease(installedChannel(), AbortSignal.timeout(5000))
       .then((latest) => {
         if (latest.version === this.release.version) return;

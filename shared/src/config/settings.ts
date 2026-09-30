@@ -23,6 +23,7 @@ interface SettingDef<S extends z.ZodType> {
   default: z.infer<S>;
   choices?: SettingChoice[];
   inverted?: boolean;
+  showWhen?: { key: string; value: string };
 }
 
 function setting<S extends z.ZodType>(def: SettingDef<S>): SettingDef<S> {
@@ -77,6 +78,16 @@ export const SETTINGS = {
     default: "on",
     choices: onOff,
     inverted: true,
+  }),
+  "updates.check": setting({
+    group: "general",
+    label: "Disable update checks",
+    hint: "Prevents terminal-browser from making a network request to check if an update is available",
+    schema: z.enum(["on", "off"]),
+    default: "on",
+    choices: onOff,
+    inverted: true,
+    showWhen: { key: "telemetry.usage", value: "off" },
   }),
   "render.fps": setting({
     group: "advanced",

@@ -20,9 +20,11 @@ export { listInstances, removeInstance, upsertInstance } from "./instances";
 export {
   anonymousId,
   lastActiveDay,
+  lastLaunchDay,
   lastSeenVersion,
   lastUrl,
   setLastActiveDay,
+  setLastLaunchDay,
   setLastSeenVersion,
   setLastUrl,
 } from "./app-state";

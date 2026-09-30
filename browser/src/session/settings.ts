@@ -262,13 +262,19 @@ export class SettingsManager {
         keys: modal.recording.chord ? formatChord(modal.recording.chord) : "",
       },
       shortcuts,
-      settings: SETTING_KEYS.map((key) => settingRow(key, this.values[key])),
+      settings: SETTING_KEYS.filter((key) => this.shown(key)).map((key) => settingRow(key, this.values[key])),
       files: {
         settings: homeRelative(this.config.files.settings),
         shortcuts: homeRelative(this.config.files.shortcuts),
       },
       release: this.host.release(),
     };
+  }
+
+  private shown(key: SettingKey): boolean {
+    const condition = SETTINGS[key].showWhen;
+    if (!condition || !isSettingKey(condition.key)) return true;
+    return this.values[condition.key] === condition.value;
   }
 
   private set(key: string, value: string | undefined) {
