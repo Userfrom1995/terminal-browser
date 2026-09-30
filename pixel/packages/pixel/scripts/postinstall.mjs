@@ -79,8 +79,8 @@ if (!shasums) {
   const error = lastError;
   if (skipBinary && fs.existsSync(typesFile)) process.exit(0);
   process.stderr.write(
-    `pixel: [placeholder copy: no patched electron v${version} is published (${error.message}). ` +
-      `This release of pixel is built against electron ${version}; a newer pixel may be needed.]\n`,
+    `pixel: no patched electron v${version} is published (${error.message}). ` +
+      `This release of pixel is built against electron ${version}; a newer pixel may be needed.\n`,
   );
   process.exit(1);
 }

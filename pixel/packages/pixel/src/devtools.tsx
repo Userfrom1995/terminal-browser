@@ -98,15 +98,11 @@ export function DevtoolsDockPane({
 }
 
 export interface DevToolsProps {
-  /** [placeholder copy: The WebView to inspect, as the ref you gave it or the handle itself.] */
   target: RefObject<WebViewHandle | null> | WebViewHandle;
   style?: Style;
   dock?: DevtoolsDock;
-  /** [placeholder copy: Devtools panel to show once open, for example "console" or "elements".] */
   panel?: string;
-  /** [placeholder copy: The devtools toolbar asked to close or to dock elsewhere. Unmount or change dock in response.] */
   onAction?(action: "close" | "dock-bottom" | "dock-right"): void;
-  /** [placeholder copy: Keep showing the last frame, stretched, while the pane changes size instead of clearing until devtools repaint. Defaults to true.] */
   keepFrame?: boolean;
 }
 
@@ -115,12 +111,11 @@ function resolveEntry(target: DevToolsProps["target"]): ViewEntry | null {
   return handle ? handleEntries.get(handle) ?? null : null;
 }
 
-/** [placeholder copy: Renders a WebView's devtools wherever this sits in the tree. Mounting opens them, unmounting closes them.] */
 export function DevTools({ target, style, dock = "right", panel, onAction, keepFrame = true }: DevToolsProps) {
   const registry = useContext(RootContext);
   if (!registry) {
     throw new Error(
-      "[placeholder copy: <DevTools> has to be rendered by a root from pixel's createRoot()]",
+      "<DevTools> has to be rendered by a root from createRoot()",
     );
   }
   const boxRef = useRef<NodeHandle>(null);

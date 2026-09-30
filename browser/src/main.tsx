@@ -5,7 +5,8 @@ import path from "node:path";
 import { app, screen } from "electron";
 
 import { runDaemon } from "./daemon";
-import { LOGS_DIR, ensureDataDir } from "pixel-store";
+import { ConfigStore, LOGS_DIR, SETTINGS_FILE, SHORTCUTS_FILE, ensureDataDir, installedVersion } from "shared";
+import { Telemetry } from "./telemetry";
 import { appLog } from "@zenbu-labs/pixel";
 import { claimProfile } from "./profile";
 import { registerScheme } from "./pages/scheme";
@@ -25,6 +26,22 @@ app.commandLine.appendSwitch("log-file", path.join(LOGS_DIR, "chromium.log"));
 app.setName("terminal-browser");
 claimProfile();
 registerScheme();
+
+const crashReports = new Telemetry({
+  version: installedVersion() ?? "dev",
+  usageEnabled: () => false,
+  crashReportsEnabled: () =>
+    new ConfigStore({ settings: SETTINGS_FILE, shortcuts: SHORTCUTS_FILE }).load().settings?.["telemetry.crashReports"] !== "off",
+  terminal: () => null,
+});
+process.on("uncaughtException", (error) => {
+  process.stderr.write(`${error instanceof Error ? error.stack : String(error)}\n`);
+  void crashReports.crashed(error, "uncaughtException");
+});
+process.on("unhandledRejection", (reason) => {
+  process.stderr.write(`${reason instanceof Error ? reason.stack : String(reason)}\n`);
+  void crashReports.crashed(reason, "unhandledRejection");
+});
 
 
 function freePort(): Promise<number> {

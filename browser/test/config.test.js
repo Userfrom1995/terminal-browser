@@ -4,13 +4,13 @@ const os = require("node:os");
 const path = require("node:path");
 const { test } = require("node:test");
 
-const { ConfigStore } = require("../dist/config/config.js");
-const { Keymap, parseChord, formatChord, chordFromEvent } = require("../dist/config/keys.js");
-const { defaultKeys } = require("../dist/config/commands.js");
+const { ConfigStore } = require("shared");
+const { Keymap, parseChord, formatChord, chordFromEvent } = require("shared");
+const { defaultKeys } = require("shared");
 const { searchUrlFor, searchOrUrl } = require("../dist/url.js");
-const { SEARCH_ENGINES, engineBySearch, parseSuggestions } = require("../dist/config/search.js");
+const { SEARCH_ENGINES, engineBySearch, parseSuggestions } = require("shared");
 const { SettingsManager } = require("../dist/session/settings.js");
-const { renderEnv, maxFps } = require("../dist/config/render.js");
+const { renderEnv, maxFps } = require("shared");
 
 const press = (key, mods = {}) => ({
   key,

@@ -1,12 +1,13 @@
 import os from "node:os";
 import path from "node:path";
 
-import { LOGS_DIR } from "pixel-store";
+import { LOGS_DIR } from "../paths";
 import { z } from "zod";
 
-import type { SettingGroup } from "../ui/types";
 import { AUTO, DISPLAY_FPS, UNCAPPED } from "./render";
 import { SEARCH_ENGINES, SUGGESTIONS_OFF } from "./search";
+
+export type SettingGroup = "general" | "advanced";
 
 export interface SettingChoice {
   value: string;
@@ -21,6 +22,7 @@ interface SettingDef<S extends z.ZodType> {
   schema: S;
   default: z.infer<S>;
   choices?: SettingChoice[];
+  inverted?: boolean;
 }
 
 function setting<S extends z.ZodType>(def: SettingDef<S>): SettingDef<S> {
@@ -57,6 +59,24 @@ export const SETTINGS = {
       })),
       { value: SUGGESTIONS_OFF, name: "Off", logo: null },
     ],
+  }),
+  "telemetry.usage": setting({
+    group: "general",
+    label: "Disable anonymous telemetry",
+    hint: "Minimal anonymous events are tracked to help improve the project",
+    schema: z.enum(["on", "off"]),
+    default: "on",
+    choices: onOff,
+    inverted: true,
+  }),
+  "telemetry.crashReports": setting({
+    group: "general",
+    label: "Disable crash reports",
+    hint: "Crash reporting help improve the project and prevents future crashes",
+    schema: z.enum(["on", "off"]),
+    default: "on",
+    choices: onOff,
+    inverted: true,
   }),
   "render.fps": setting({
     group: "advanced",

@@ -1,3 +1,5 @@
+import crypto from "node:crypto";
+
 import { store } from "./client";
 
 // why are we using raw sql here?
@@ -22,4 +24,28 @@ export function lastUrl(): string | null {
 
 export function setLastUrl(url: string): void {
   setAppState("last-url", url);
+}
+
+export function anonymousId(): string {
+  const existing = getAppState("anonymous-id");
+  if (existing) return existing;
+  const id = crypto.randomUUID();
+  setAppState("anonymous-id", id);
+  return id;
+}
+
+export function lastSeenVersion(): string | null {
+  return getAppState("last-seen-version");
+}
+
+export function setLastSeenVersion(version: string): void {
+  setAppState("last-seen-version", version);
+}
+
+export function lastActiveDay(): string | null {
+  return getAppState("last-active-day");
+}
+
+export function setLastActiveDay(day: string): void {
+  setAppState("last-active-day", day);
 }

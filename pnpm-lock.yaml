@@ -26,15 +26,15 @@ importers:
       micromark-extension-gfm:
         specifier: ^3.0.0
         version: 3.0.0
-      pixel-store:
-        specifier: workspace:*
-        version: link:../store
       react:
         specifier: ^18.3.1
         version: 18.3.1
       react-grab:
         specifier: 0.2.0
         version: 0.2.0(react@18.3.1)
+      shared:
+        specifier: workspace:*
+        version: link:../shared
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -54,9 +54,9 @@ importers:
       '@zenbu-labs/pixel':
         specifier: workspace:*
         version: link:../pixel/packages/pixel
-      pixel-store:
+      shared:
         specifier: workspace:*
-        version: link:../store
+        version: link:../shared
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -247,7 +247,7 @@ importers:
         specifier: 0.0.20
         version: link:../native/linux-x64
 
-  store:
+  shared:
     dependencies:
       drizzle-orm:
         specifier: ^0.44.5

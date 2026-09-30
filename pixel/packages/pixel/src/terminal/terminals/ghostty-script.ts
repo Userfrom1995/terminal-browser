@@ -58,13 +58,13 @@ function send(pid, eventClass, eventId, params) {
   const failure = Ref();
   const reply = event.sendEventWithOptionsTimeoutError(WAIT_FOR_REPLY, 10, failure);
   if (reply.isNil()) {
-    throw new Error("[placeholder copy: Ghostty (pid " + pid + ") did not answer: " + ObjC.unwrap(failure[0].localizedDescription) + "]");
+    throw new Error("Ghostty (pid " + pid + ") did not answer: " + ObjC.unwrap(failure[0].localizedDescription) );
   }
   const number = reply.paramDescriptorForKeyword(code("errn"));
   if (!number.isNil()) {
     const message = reply.paramDescriptorForKeyword(code("errs"));
     const detail = message.isNil() ? "" : ": " + ObjC.unwrap(message.stringValue);
-    const error = new Error("[placeholder copy: Ghostty (pid " + pid + ") refused the request (" + number.int32Value + ")" + detail + "]");
+    const error = new Error("Ghostty (pid " + pid + ") refused the request (" + number.int32Value + ")" + detail );
     error.code = number.int32Value;
     throw error;
   }

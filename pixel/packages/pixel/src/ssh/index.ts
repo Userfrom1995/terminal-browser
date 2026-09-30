@@ -21,7 +21,6 @@ export interface RemoteBundle {
 export type StatusLine = (line: string) => void;
 
 export interface SshOptions {
-  /** [placeholder copy: Whether ssh may use this process's terminal for password and host key prompts. Off when called from inside a running app, where the terminal is already taken; ssh then fails instead of prompting.] */
   terminal?: boolean;
 }
 
@@ -29,7 +28,7 @@ export function parseSshTarget(target: string): { destination: string; sshPort: 
   const match = /^([A-Za-z0-9._-]+@)?([A-Za-z0-9._-]+)(:(\d+))?$/.exec(target);
   if (!match) {
     throw new Error(
-      `[placeholder copy: invalid ssh target ${target} (user@host, host, user@host:port, or a shell alias for ssh)]`,
+      `invalid ssh target ${target} (user@host, host, user@host:port, or a shell alias for ssh)`,
     );
   }
   return { destination: `${match[1] ?? ""}${match[2]}`, sshPort: match[4] ?? null };
@@ -80,12 +79,12 @@ function parseSshWords(
     }
     if (found) {
       throw new Error(
-        `[placeholder copy: invalid ssh target ${target} (both ${found} and ${token} look like destinations)]`,
+        `invalid ssh target ${target} (both ${found} and ${token} look like destinations)`,
       );
     }
     found = token;
   }
-  if (!found) throw new Error(`[placeholder copy: invalid ssh target ${target} (no destination)]`);
+  if (!found) throw new Error(`invalid ssh target ${target} (no destination)`);
   const { destination, sshPort } = parseSshTarget(found);
   return { destination, hostArgs: [...hostArgs, ...(sshPort ? ["-p", sshPort] : [])] };
 }
@@ -173,7 +172,7 @@ export async function openSshTunnel(
   });
   if (code !== 0) {
     const detail = stderr.filter(Boolean).join("\n");
-    throw new Error(`[placeholder copy: ssh to ${destination} failed${detail ? `: ${detail}` : ""}]`);
+    throw new Error(`ssh to ${destination} failed${detail ? `: ${detail}` : ""}`);
   }
   await waitForSocks(socksPort, destination);
   status(`connected ${destination}`);
@@ -193,11 +192,8 @@ export async function openSshTunnel(
 }
 
 export interface SshSessionOptions extends SshOptions {
-  /** [placeholder copy: Where to connect, as you would type it after ssh: user@host, host:port, a full ssh command with flags, or a shell alias.] */
   target: string;
-  /** [placeholder copy: A directory to install and start on the host. It must hold an executable start that prints READY <url>; setup and stop are optional.] */
   bundle?: string | null;
-  /** [placeholder copy: Directory on the host that bundles are installed under.] */
   remoteBase?: string | null;
   status?: StatusLine;
 }
@@ -205,16 +201,11 @@ export interface SshSessionOptions extends SshOptions {
 export interface SshSession {
   destination: string;
   socksPort: number;
-  /** [placeholder copy: The url the bundle's start script announced, when a bundle was given.] */
   url: string | undefined;
-  /** [placeholder copy: Props for the WebView that should browse through this host: spread them onto it.] */
   view: { proxy: string; partition: string };
   stop(): void;
 }
 
-// The whole ssh mode in one step: tunnel, then bundle, then the props a page
-// needs to browse through the host. Stopping runs in reverse and also happens
-// when the process exits.
 export async function connectSsh(options: SshSessionOptions): Promise<SshSession> {
   const status = options.status ?? (() => {});
   const terminal = options.terminal ?? true;
@@ -262,17 +253,17 @@ export function validateBundleDir(dir: string): void {
   try {
     stat = fs.statSync(dir);
   } catch {
-    throw new Error(`[placeholder copy: bundle ${dir} does not exist]`);
+    throw new Error(`bundle ${dir} does not exist`);
   }
-  if (!stat.isDirectory()) throw new Error(`[placeholder copy: bundle ${dir} is not a directory]`);
+  if (!stat.isDirectory()) throw new Error(`bundle ${dir} is not a directory`);
   let start: fs.Stats;
   try {
     start = fs.statSync(path.join(dir, "start"));
   } catch {
-    throw new Error(`[placeholder copy: bundle ${dir} has no start script]`);
+    throw new Error(`bundle ${dir} has no start script`);
   }
   if (!start.isFile() || !(start.mode & 0o111)) {
-    throw new Error(`[placeholder copy: bundle ${dir}/start is not executable]`);
+    throw new Error(`bundle ${dir}/start is not executable`);
   }
 }
 
@@ -354,12 +345,12 @@ function upload(tunnel: SshTunnel, dir: string, remoteDir: string): void {
     env: { ...process.env, COPYFILE_DISABLE: "1" },
     maxBuffer: 256 * 1024 * 1024,
   });
-  if (tar.status !== 0 || !tar.stdout) throw new Error(`[placeholder copy: could not pack ${dir}]`);
+  if (tar.status !== 0 || !tar.stdout) throw new Error(`could not pack ${dir}`);
   const result = run(tunnel, `mkdir -p "${remoteDir}" && tar -xz -C "${remoteDir}"`, {
     input: tar.stdout,
   });
   if (result.status !== 0) {
-    throw new Error(`[placeholder copy: could not upload the bundle to ${tunnel.destination}]`);
+    throw new Error(`could not upload the bundle to ${tunnel.destination}`);
   }
 }
 
@@ -373,7 +364,7 @@ function setup(tunnel: SshTunnel, remoteDir: string, terminal: boolean, status: 
     for (const line of `${result.stdout ?? ""}${result.stderr ?? ""}`.split("\n")) if (line.trim()) status(line);
   }
   if (result.status !== 0) {
-    throw new Error(`[placeholder copy: the bundle's setup script failed on ${tunnel.destination}]`);
+    throw new Error(`the bundle's setup script failed on ${tunnel.destination}`);
   }
 }
 
@@ -418,7 +409,7 @@ function launch(
       }
     };
     const timer = setTimeout(() => {
-      finish(new Error(`[placeholder copy: ${name} never printed READY <url>]\n${tail.join("\n")}`));
+      finish(new Error(`${name} never printed READY <url>\n${tail.join("\n")}`));
     }, READY_TIMEOUT_MS);
     const sawLine = (line: string) => {
       tail.push(line);
@@ -427,7 +418,7 @@ function launch(
       if (!ready) return;
       const url = pageUrl(ready[1]);
       if (!url) {
-        finish(new Error(`[placeholder copy: ${name} printed READY ${ready[1]}, which is not an http(s) url]`));
+        finish(new Error(`${name} printed READY ${ready[1]}, which is not an http(s) url`));
         return;
       }
       status(`${name} is up at ${url}`);
@@ -449,7 +440,7 @@ function launch(
       if (buffer.trim()) sawLine(buffer.trim());
       finish(
         new Error(
-          `[placeholder copy: ${name} exited with code ${code} before printing READY <url>]\n${tail.join("\n")}`,
+          `${name} exited with code ${code} before printing READY <url>\n${tail.join("\n")}`,
         ),
       );
     });
@@ -494,7 +485,7 @@ function waitForSocks(port: number, destination: string): Promise<void> {
     const socket = net.connect(port, "127.0.0.1");
     const timer = setTimeout(() => {
       socket.destroy();
-      reject(new Error(`[placeholder copy: the ssh proxy for ${destination} never started listening]`));
+      reject(new Error(`the ssh proxy for ${destination} never started listening`));
     }, 5000);
     socket.once("connect", () => {
       clearTimeout(timer);

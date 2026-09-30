@@ -115,6 +115,33 @@ fully quit terminal-browser operations, you can use this shutdown command. This 
 close all open browsers.
 `,
   },
+  config: {
+    summary: "Get and set settings and shortcuts",
+    usage: "terminal-browser config <list|get|set|unset|path> [key] [value]",
+    body: `
+Reads and writes the settings.json and shortcuts.json files.
+
+Settings are addressed by their settings.json key. Shortcuts are addressed as
+shortcuts.<command> and take a comma separated list of key chords, or none to
+unbind. unset restores the default.
+
+Commands:
+  list                 List every setting and shortcut with its current value
+  get <key>            Print the value of one key
+  set <key> <value>    Set a key
+  unset <key>          Restore a key to its default
+  path                 Print the paths of the config files
+
+Examples:
+  terminal-browser config list
+  terminal-browser config get search.engine
+  terminal-browser config set telemetry.usage off
+  terminal-browser config set shortcuts.tab.new "cmd+t,ctrl+t"
+  terminal-browser config set shortcuts.record.toggle none
+  terminal-browser config unset render.fps
+  terminal-browser config path
+`,
+  },
   action: {
     summary: "Use the open browser through the agent-browser CLI",
     usage: "terminal-browser action [selectors] -- <command>",

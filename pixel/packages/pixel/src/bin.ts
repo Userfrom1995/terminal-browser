@@ -24,11 +24,11 @@ function resolveEntry(given: string): string {
     }
     const entry = path.join(target, main);
     if (!fs.existsSync(entry)) {
-      fail(`[placeholder copy: ${entry} does not exist. Build your app or point "main" in package.json at the built entry.]`);
+      fail(`${entry} does not exist. Build your app or point "main" in package.json at the built entry.`);
     }
     return entry;
   }
-  if (!fs.existsSync(target)) fail(`[placeholder copy: no such file ${target}]`);
+  if (!fs.existsSync(target)) fail(`no such file ${target}`);
   return target;
 }
 
@@ -51,7 +51,7 @@ function electronBinary(): string {
   const dist = path.resolve(__dirname, "..", "electron", "dist");
   if (!fs.existsSync(path.join(dist, ".zenbu-electron-sha256"))) {
     fail(
-      "[placeholder copy: the patched electron build is not installed. Run `node node_modules/@zenbu-labs/pixel/scripts/postinstall.mjs` (npm normally runs it for you on install).]",
+      "the patched electron build is not installed. Run `node node_modules/@zenbu-labs/pixel/scripts/postinstall.mjs` (npm normally runs it for you on install).",
     );
   }
   return process.platform === "darwin"
@@ -71,7 +71,7 @@ function ownTty(): string {
     const out = execFileSync("tty", { stdio: ["inherit", "pipe", "ignore"], encoding: "utf8" }).trim();
     if (out.startsWith("/dev/")) return out;
   } catch {}
-  return fail("[placeholder copy: could not work out which tty this shell is on]");
+  return fail("could not work out which tty this shell is on");
 }
 
 async function main(): Promise<number> {
@@ -81,15 +81,15 @@ async function main(): Promise<number> {
   const appArgs = passthrough < 0 ? [] : args.slice(passthrough + 1);
   if (own.includes("--help") || own.includes("-h")) {
     process.stdout.write(
-      "[placeholder copy: usage: pixel [entry|dir] [-- app args]\n  Runs an app's main file inside the pixel runtime, in this terminal pane.]\n",
+      "usage: pixel [entry|dir] [-- app args]\n  Runs an app's main file inside the pixel runtime, in this terminal pane.\n",
     );
     return 0;
   }
   const stray = own.slice(1).find((arg) => arg.startsWith("-")) ?? own.find((arg) => arg.startsWith("-"));
   if (stray) {
-    fail(`[placeholder copy: unknown option ${stray}. pixel takes an entry and nothing else; put your app's arguments after --]`);
+    fail(`unknown option ${stray}. pixel takes an entry and nothing else; put your app's arguments after --`);
   }
-  if (own.length > 1) fail(`[placeholder copy: unexpected ${own[1]}; put your app's arguments after --]`);
+  if (own.length > 1) fail(`unexpected ${own[1]}; put your app's arguments after --`);
   const entry = resolveEntry(own[0] ?? ".");
 
   const tty = process.env.PIXEL_TTY ?? ownTty();
@@ -97,7 +97,7 @@ async function main(): Promise<number> {
   const announced = owner ? announceGuest(owner, appName(appDir(entry))) : null;
   if (!owner && !process.env.PIXEL_EMBED) {
     if (!process.stdin.isTTY || !process.stdout.isTTY) {
-      fail("[placeholder copy: pixel draws into the terminal, so it needs to run on a tty]");
+      fail("tty required");
     }
     const check = await checkTerminal(detect());
     if (check.graphics === "unsupported") {

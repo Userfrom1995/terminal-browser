@@ -15,33 +15,38 @@ import type {
 import { detect } from "@zenbu-labs/pixel/terminal";
 import type { Pane, Terminal } from "@zenbu-labs/pixel/terminal";
 
-import { bundledAsset } from "../assets";
-import { CopyOnSelect, Grab, reactGrabPreloadPath } from "../grab/grab";
-import { AgentPaneFinder } from "../grab/target";
-import { maxFps, renderEnv } from "../config/render";
-import { ENGINE_LOG_FILE } from "../config/settings";
-import type { EmbeddedAgent } from "../grab/target";
-import type { ZoomDirection } from "../zoom";
 import {
-  SHORTCUTS_FILE,
-  SETTINGS_FILE,
-  TERMINAL_SOCKET_ENV,
+  commandLabel,
+  ENGINE_LOG_FILE,
   fetchLatestRelease,
   installedChannel,
   installedVersion,
   lastUrl,
   listApps,
+  listStep,
+  maxFps,
+  renderEnv,
   setLastUrl,
   settings as settingsTable,
+  SETTINGS_FILE,
+  SHORTCUTS_FILE,
   socketTerminal,
   store,
+  SUGGESTIONS_OFF,
+  TERMINAL_SOCKET_ENV,
   upgradeCommand,
-} from "pixel-store";
-import type { InstanceRow, RegisteredApp } from "pixel-store";
+} from "shared";
+import type {
+  CommandId,
+  InstanceRow,
+  RegisteredApp,
+} from "shared";
+import { bundledAsset } from "../assets";
+import { CopyOnSelect, Grab, reactGrabPreloadPath } from "../grab/grab";
+import { AgentPaneFinder } from "../grab/target";
+import type { EmbeddedAgent } from "../grab/target";
+import type { ZoomDirection } from "../zoom";
 
-import { commandLabel } from "../config/commands";
-import type { CommandId } from "../config/commands";
-import { listStep } from "../config/keys";
 
 import type { RecordTarget } from "../record/recorder";
 import { RecordSession } from "../record/session";
@@ -73,8 +78,8 @@ import { clampDevtoolsFraction, computeLayout, dividerFraction, recordBarHeight 
 // Installed builds run from a dist root; anything else is a source checkout.
 const DEV_BUILD = !process.env.TERMINAL_BROWSER_DIST_ROOT;
 import type { DevtoolsPlacement, SurfaceLayout } from "./layout";
-import { SUGGESTIONS_OFF } from "../config/search";
 import { SettingsManager } from "./settings";
+import { Telemetry } from "../telemetry";
 import { fetchSuggestions } from "./suggest";
 import { TabManager } from "./tabs";
 
@@ -201,6 +206,12 @@ class Session {
     latest: null,
     upgrade: upgradeCommand(),
   };
+  private readonly telemetry = new Telemetry({
+    version: this.release.version,
+    usageEnabled: () => this.settings.get("telemetry.usage") !== "off",
+    crashReportsEnabled: () => false,
+    terminal: () => this.terminal?.name ?? null,
+  });
   private readonly tabs: TabManager;
   private readonly fallbackState: WebViewState;
 
@@ -326,6 +337,7 @@ class Session {
   async start(): Promise<void> {
     if (process.platform === "darwin") app.dock?.hide();
     this.checkForUpdate();
+    this.telemetry.launched();
     await this.loadDevtoolsSettings();
     if (!this.ctx.tty) process.stdout.write(`\x1b]2;${this.marker}\x07`);
     this.root = createRoot({
@@ -340,6 +352,9 @@ class Session {
         this.render();
       },
       onColors: () => this.render(),
+      onFocus: (focused) => {
+        if (focused) this.telemetry.used();
+      },
       onVisible: (visible) => {
         if (this.sessionHidden === !visible) return;
         this.sessionHidden = !visible;
@@ -823,6 +838,7 @@ class Session {
   }
 
   private runCommand(id: CommandId) {
+    this.telemetry.used();
     const handle = this.tabs.activeHandle;
     switch (id) {
       case "quit":

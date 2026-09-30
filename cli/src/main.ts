@@ -15,7 +15,7 @@ import {
   registerApp,
   socketTerminal,
   unregisterApp,
-} from "pixel-store";
+} from "shared";
 import {
   callerTty,
   canSplit,
@@ -41,6 +41,7 @@ import { connectSsh, validateSshTarget } from "@zenbu-labs/pixel/ssh";
 import type { InstanceRecord } from "./registry";
 import { installedVersion, upgradeCommand } from "./upgrade";
 import { claudeBridgeCommand } from "./claude-bridge";
+import { configCommand } from "./config";
 
 const DIST_ROOT = process.env.TERMINAL_BROWSER_DIST_ROOT ?? null;
 const CAPABILITIES = ["embedding"] as const;
@@ -723,6 +724,7 @@ async function main(): Promise<number> {
     return editors !== 0 ? editors : sandbox;
   }
   if (command === "upgrade") return upgradeCommand();
+  if (command === "config") return configCommand(args);
   if (command === "claude-bridge") return claudeBridgeCommand(args);
   if (command === "shutdown") return shutdownDaemon();
   if (command === "register-app") return registerAppCommand(args);

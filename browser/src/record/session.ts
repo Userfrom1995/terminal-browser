@@ -7,6 +7,7 @@ import type {
   Surface,
   WheelEvent,
 } from "@zenbu-labs/pixel";
+import { listStep } from "shared";
 import type { RecordTarget } from "./recorder";
 import { zoomDirection } from "../zoom";
 import { toolbarSize } from "../ui/markup-canvas";
@@ -34,7 +35,6 @@ import {
   unionRects,
 } from "./model";
 import type { CropScope, HandleId, MarkupObject, Rect, Tool, Vec } from "./model";
-import { listStep } from "../config/keys";
 import { newRecordingDir } from "./paths";
 import {
   CLICK_PULSE_MS,

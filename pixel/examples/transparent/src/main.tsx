@@ -32,9 +32,9 @@ function App() {
           border: { width: 1, color: veil(fg, 56) },
         }}
       >
-        <Text style={{ fontSize: rem * 1.1, color: fg }}>[placeholder copy: transparent root]</Text>
+        <Text style={{ fontSize: rem * 1.1, color: fg }}>transparent root</Text>
         <Text style={{ fontSize: rem * 0.85, color: veil(fg, 200) }}>
-          [placeholder copy: The root clears to alpha 0 and this card is a translucent veil, so a translucent terminal shows through both. Over an opaque terminal it looks like an ordinary panel. ctrl+c quits.]
+          The root clears to alpha 0 and this card is a translucent veil, so a translucent terminal shows through both. Over an opaque terminal it looks like an ordinary panel. ctrl+c quits.
         </Text>
       </Box>
       <WebView

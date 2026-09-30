@@ -4,16 +4,30 @@ import path from "node:path";
 import type { EngineKeyEvent } from "@zenbu-labs/pixel";
 import { z } from "zod";
 
+import {
+  chordFromEvent,
+  commandLabel,
+  ConfigStore,
+  defaultSettings,
+  engineBySearch,
+  engineBySuggest,
+  formatChord,
+  isCommandId,
+  isSettingKey,
+  Keymap,
+  SETTING_KEYS,
+  SETTINGS,
+  SUGGESTIONS_OFF,
+} from "shared";
+import type {
+  Chord,
+  CommandId,
+  ConfigFiles,
+  SettingKey,
+  Settings,
+  ShortcutOverrides,
+} from "shared";
 import { bundledAsset } from "../assets";
-import { commandLabel, isCommandId } from "../config/commands";
-import type { CommandId } from "../config/commands";
-import { ConfigStore } from "../config/config";
-import type { ConfigFiles } from "../config/config";
-import { Keymap, chordFromEvent, formatChord } from "../config/keys";
-import type { Chord, ShortcutOverrides } from "../config/keys";
-import { SUGGESTIONS_OFF, engineBySearch, engineBySuggest } from "../config/search";
-import { SETTINGS, SETTING_KEYS, defaultSettings, isSettingKey } from "../config/settings";
-import type { SettingKey, Settings } from "../config/settings";
 import type { ReleaseView, SettingRow, SettingsActions, SettingsSection, SettingsView } from "../ui/types";
 
 export interface SettingsHost {
@@ -49,7 +63,7 @@ function settingRow(key: SettingKey, value: string): SettingRow {
   }));
   const values = def.choices.map((choice) => choice.value);
   if (values.length === 2 && values.includes("on") && values.includes("off")) {
-    return { ...base, kind: "toggle", value };
+    return { ...base, kind: "toggle", value, inverted: def.inverted ?? false };
   }
   return { ...base, kind: "choice", value, choices, custom: !(def.schema instanceof z.ZodEnum) };
 }

@@ -63,7 +63,9 @@ export interface PageMenuView {
   items: PageMenuItem[];
 }
 
-export type SettingGroup = "general" | "advanced";
+import type { SettingGroup } from "shared";
+
+export type { SettingGroup };
 
 export type SettingsSection = SettingGroup | "shortcuts";
 
@@ -89,7 +91,7 @@ export type SettingRow = {
   modified: boolean;
 } & (
   | { kind: "string"; value: string }
-  | { kind: "toggle"; value: string }
+  | { kind: "toggle"; value: string; inverted: boolean }
   | { kind: "choice"; value: string; choices: SettingChoiceView[]; custom: boolean }
 );
 

@@ -116,10 +116,10 @@ export const ghostty: Detect = (env, run) => {
     const running = [...processes].filter(([, { command }]) => GHOSTTY_BINARY.test(command)).map(([pid]) => pid);
     if (running.length === 1) return running[0];
     if (running.length === 0) {
-      throw new Error("[placeholder copy: Ghostty is not running, so there is no window to script]");
+      throw new Error("Ghostty is not running, so there is no window to script");
     }
     throw new Error(
-      `[placeholder copy: ${running.length} Ghostty processes are running (pids ${running.join(", ")}) and this shell is not inside any of them, so we cannot tell which one to script]`,
+      `${running.length} Ghostty processes are running (pids ${running.join(", ")}) and this shell is not inside any of them, so we cannot tell which one to script`,
     );
   }
 

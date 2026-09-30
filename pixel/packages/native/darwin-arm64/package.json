@@ -1,7 +1,7 @@
 {
   "name": "@zenbu-labs/pixel-native-darwin-arm64",
   "version": "0.0.20",
-  "description": "[placeholder copy: prebuilt engine binary for pixel on darwin-arm64]",
+  "description": "",
   "license": "MIT",
   "repository": {
     "type": "git",

@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import readline from "node:readline";
 
-import { fetchLatestRelease, installedByHomebrew, installedChannel, installedVersion } from "pixel-store";
+import { fetchLatestRelease, installedByHomebrew, installedChannel, installedVersion } from "shared";
 
 import { instances } from "./registry";
 import type { InstanceRecord } from "./registry";

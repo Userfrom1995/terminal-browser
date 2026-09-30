@@ -458,7 +458,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
       const host = () => {
         const current = hostRef.current;
         if (!current) {
-          throw new Error("[placeholder copy: this WebView has already been unmounted]");
+          throw new Error("this WebView has already been unmounted]");
         }
         return current;
       };

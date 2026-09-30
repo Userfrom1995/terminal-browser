@@ -106,7 +106,7 @@ function waitForSocket(socket: string): Promise<void> {
 export function createRoot(options: RootOptions = {}): Root {
   if (!app.isReady()) {
     throw new Error(
-      "[placeholder copy: createRoot() needs electron to be ready. Run your entry with `pixel .`, which waits for app.whenReady() before loading it.]",
+      "createRoot() needs electron to be ready. Run your entry with `pixel .`, which waits for app.whenReady() before loading it.",
     );
   }
   const env = options.sessionEnv ?? process.env;
@@ -354,7 +354,7 @@ export function createRoot(options: RootOptions = {}): Root {
     engineRoot.flushSync(() => {
       root.render(<WebView ref={pageRef} src={url} style={{ width: "100%", height: "100%" }} {...options} />);
     });
-    if (!pageRef.current) throw new Error("[placeholder copy: the page did not mount]");
+    if (!pageRef.current) throw new Error("the page did not mount");
     return pageRef.current;
   };
 

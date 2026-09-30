@@ -110,8 +110,11 @@ export function SettingLine({
   const [hover, setHover] = useState(false);
   const preset = row.kind === "choice" && row.choices.some((choice) => choice.value === row.value);
   const customShown = row.kind === "choice" && row.custom && (customPicked || !preset);
-  const reset = row.modified && (hover || row.group === "advanced") && (
-    <IconButton icon="reload" rem={rem} theme={theme} onClick={() => actions.reset(row.key)} />
+  const showReset = row.modified && (hover || row.group === "advanced");
+  const reset = (
+    <Box style={{ width: rem * 1.6, height: rem * 1.6, flexShrink: 0 }}>
+      {showReset && <IconButton icon="reload" rem={rem} theme={theme} onClick={() => actions.reset(row.key)} />}
+    </Box>
   );
   return (
     <Box
@@ -133,10 +136,10 @@ export function SettingLine({
         {reset}
         {row.kind === "toggle" && (
           <Toggle
-            on={row.value === "on"}
+            on={(row.value === "on") !== row.inverted}
             rem={rem}
             theme={theme}
-            onChange={(on) => actions.set(row.key, on ? "on" : "off")}
+            onChange={(on) => actions.set(row.key, on !== row.inverted ? "on" : "off")}
           />
         )}
         {row.kind === "choice" && (

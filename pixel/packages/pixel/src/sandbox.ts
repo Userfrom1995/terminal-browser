@@ -2,8 +2,8 @@ import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-
-const REFUSAL = `[placeholder copy: the codex sandbox blocks commands pixel needs to run to determine the terminal pane it is running in.]
+// probably need app name injection support here
+const REFUSAL = `the codex sandbox blocks commands that are needed to determine the terminal pane the command is ran from.]
 Re-run this command with escalated permissions.`;
 
 function inCodex(): boolean {

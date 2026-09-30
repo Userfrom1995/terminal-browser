@@ -75,7 +75,6 @@ export interface HostOptions {
   socket: string;
   pane: string;
   name: string;
-  /** [placeholder copy: Set when the host is not pixel: frames are drawn into this terminal as kitty virtual placements the host positions.] */
   tty?: string;
 }
 

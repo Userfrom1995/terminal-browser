@@ -1,7 +1,7 @@
 packages:
   - browser
   - cli
-  - store
+  - shared
   - monitor
   - pixel/packages/*
   - pixel/packages/native/*

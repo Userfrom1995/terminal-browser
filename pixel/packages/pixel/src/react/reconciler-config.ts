@@ -78,7 +78,6 @@ export interface ContainerSelection {
 export interface BoxProps {
   style?: Style;
   id?: string;
-  /** [placeholder copy: Lays the box out as nothing and paints none of it, keeping its children mounted.] */
   hidden?: boolean;
   onClick?: (event: ClickEvent) => void;
   onClickOutside?: (event: ClickEvent) => void;

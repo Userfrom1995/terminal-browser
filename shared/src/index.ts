@@ -17,7 +17,15 @@ export type { Store } from "./client";
 export { appState, instances, settings } from "./schema";
 export type { DevtoolsDock, InstanceRow, NewInstanceRow, SettingsRow } from "./schema";
 export { listInstances, removeInstance, upsertInstance } from "./instances";
-export { lastUrl, setLastUrl } from "./app-state";
+export {
+  anonymousId,
+  lastActiveDay,
+  lastSeenVersion,
+  lastUrl,
+  setLastActiveDay,
+  setLastSeenVersion,
+  setLastUrl,
+} from "./app-state";
 export {
   INTEROP_APPS_DIR,
   INTEROP_INSTANCES_DIR,
@@ -38,3 +46,10 @@ export type { InteropInstance, OpenResult, OpenSpec, RegisteredApp } from "./int
 export { TERMINAL_SOCKET_ENV, TERMINAL_SOCKET_PROTOCOL, socketTerminal } from "./terminal-socket";
 export { fetchLatestRelease, installedByHomebrew, installedChannel, installedVersion, upgradeCommand } from "./release";
 export type { LatestRelease } from "./release";
+export * from "./config/commands";
+export * from "./config/config";
+export * from "./config/json";
+export * from "./config/keys";
+export * from "./config/render";
+export * from "./config/search";
+export * from "./config/settings";

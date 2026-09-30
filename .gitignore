@@ -45,7 +45,7 @@ agent/app/.data/
 browser/dist/
 cli/dist/
 terminals/dist/
-store/dist/
+shared/dist/
 .claude/worktrees/
 tools/
 dist-release/
