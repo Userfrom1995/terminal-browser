@@ -113,6 +113,7 @@ terminal-browser also collects crash reports if terminal-browser fails to start 
 - disabling via the settings GUI in general
 - terminal-browser config set telemetry.crashReports off
 
+If you are using [pixel/](pixel/), no telemetry is ever active and there is nothing to disable.
 
 ### Roadmap
 - linux support ✅
