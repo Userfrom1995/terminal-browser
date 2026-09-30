@@ -7,6 +7,7 @@ import { app, screen } from "electron";
 import { runDaemon } from "./daemon";
 import { ConfigStore, LOGS_DIR, SETTINGS_FILE, SHORTCUTS_FILE, ensureDataDir, installedVersion } from "shared";
 import { Telemetry } from "./telemetry";
+import type { CrashSource } from "./telemetry";
 import { appLog } from "@zenbu-labs/pixel";
 import { claimProfile } from "./profile";
 import { registerScheme } from "./pages/scheme";
@@ -35,15 +36,16 @@ const crashReports = new Telemetry({
     new ConfigStore({ settings: SETTINGS_FILE, shortcuts: SHORTCUTS_FILE }).load().settings?.["telemetry.crashReports"] !== "off",
   terminal: () => null,
 });
-process.on("uncaughtException", (error) => {
+function reportAndExit(error: unknown, source: CrashSource) {
   process.stderr.write(`${error instanceof Error ? error.stack : String(error)}\n`);
   const exit = () => app.exit(1);
   const deadline = setTimeout(exit, CRASH_REPORT_EXIT_DEADLINE_MS);
-  void crashReports.crashed(error, "uncaughtException").finally(() => {
+  void crashReports.crashed(error, source).finally(() => {
     clearTimeout(deadline);
     exit();
   });
-});
+}
+process.on("uncaughtException", (error) => reportAndExit(error, "uncaughtException"));
 process.on("unhandledRejection", (reason) => {
   process.stderr.write(`${reason instanceof Error ? reason.stack : String(reason)}\n`);
   void crashReports.crashed(reason, "unhandledRejection");
@@ -78,7 +80,4 @@ void (async () => {
       .join(", ")}`,
   );
   await runDaemon(cdpPort);
-})().catch((error) => {
-  process.stderr.write(`${error instanceof Error ? error.stack : String(error)}\n`);
-  app.exit(1);
-});
+})().catch((error) => reportAndExit(error, "startup"));

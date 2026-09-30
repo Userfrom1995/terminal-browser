@@ -11,19 +11,19 @@ import {
   setLastActiveDay,
   setLastLaunchDay,
   setLastSeenVersion,
+  telemetryOptedOutByEnv,
 } from "shared";
 
 const POSTHOG_PROJECT_KEY = "phc_CGHn2kUdTTqGJJNR3td6hRwzE4KexxdssMsGtTMtyZXk";
 const POSTHOG_ORIGIN = process.env.TERMINAL_BROWSER_TELEMETRY_ORIGIN ?? "https://eu.i.posthog.com";
 const PERSON_PROFILES = false;
 const SEND_TIMEOUT_MS = 5000;
-const OPT_OUT_ENV_VARS = ["DO_NOT_TRACK", "TERMINAL_BROWSER_NO_TELEMETRY"];
 const ERROR_TYPE_MAX_LENGTH = 64;
 export const TELEMETRY_LOG_FILE = path.join(LOGS_DIR, "telemetry.jsonl");
 
 type EventName = "app_launched" | "app_upgraded" | "daily_active" | "$exception";
 
-export type CrashSource = "uncaughtException" | "unhandledRejection";
+export type CrashSource = "uncaughtException" | "unhandledRejection" | "startup";
 
 interface TelemetryOptions {
   version: string;
@@ -34,13 +34,6 @@ interface TelemetryOptions {
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
-}
-
-function envOptsOut(): boolean {
-  return OPT_OUT_ENV_VARS.some((name) => {
-    const value = process.env[name]?.trim().toLowerCase();
-    return value === "1" || value === "true" || value === "yes" || value === "on";
-  });
 }
 
 export function errorType(error: unknown): string {
@@ -86,7 +79,7 @@ export class Telemetry {
         "$exception",
         {
           source,
-          $exception_level: source === "uncaughtException" ? "fatal" : "error",
+          $exception_level: source === "unhandledRejection" ? "error" : "fatal",
           $exception_fingerprint: type,
           $exception_list: [{ type, value: type, mechanism: { handled: false, synthetic: false } }],
         },
@@ -100,7 +93,7 @@ export class Telemetry {
   private allowed(kind: "usage" | "crash"): boolean {
     if (!POSTHOG_PROJECT_KEY) return false;
     if (this.options.version === "dev" && !process.env.TERMINAL_BROWSER_TELEMETRY_ORIGIN) return false;
-    if (envOptsOut()) return false;
+    if (telemetryOptedOutByEnv()) return false;
     return kind === "usage" ? this.options.usageEnabled() : this.options.crashReportsEnabled();
   }
 
