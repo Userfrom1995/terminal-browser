@@ -1,7 +1,7 @@
 {
   "name": "@zenbu-labs/pixel",
   "version": "0.0.20",
-  "description": "[placeholder cop: Electron apps that render into your terminal pane]",
+  "description": "Build graphical applications in the terminal",
   "license": "MIT",
   "repository": {
     "type": "git",

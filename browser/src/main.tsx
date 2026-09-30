@@ -27,6 +27,7 @@ app.setName("terminal-browser");
 claimProfile();
 registerScheme();
 
+const CRASH_REPORT_EXIT_DEADLINE_MS = 2000;
 const crashReports = new Telemetry({
   version: installedVersion() ?? "dev",
   usageEnabled: () => false,
@@ -36,7 +37,12 @@ const crashReports = new Telemetry({
 });
 process.on("uncaughtException", (error) => {
   process.stderr.write(`${error instanceof Error ? error.stack : String(error)}\n`);
-  void crashReports.crashed(error, "uncaughtException");
+  const exit = () => app.exit(1);
+  const deadline = setTimeout(exit, CRASH_REPORT_EXIT_DEADLINE_MS);
+  void crashReports.crashed(error, "uncaughtException").finally(() => {
+    clearTimeout(deadline);
+    exit();
+  });
 });
 process.on("unhandledRejection", (reason) => {
   process.stderr.write(`${reason instanceof Error ? reason.stack : String(reason)}\n`);
