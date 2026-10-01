@@ -189,8 +189,8 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(function WebView(
     const h = hover.current;
     const shape = h.divider
       ? dockRef.current === "bottom"
-        ? "row-resize"
-        : "col-resize"
+        ? "ns-resize"
+        : "ew-resize"
       : h.devtools
         ? host?.devtools?.cursorShape ?? "default"
         : host?.popup

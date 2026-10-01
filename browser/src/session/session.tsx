@@ -592,7 +592,7 @@ class Session {
     devtoolsDividerHover: (hovering) => {
       this.dividerHover = hovering;
       this.root?.setPointerShape(
-        hovering ? (this.devtoolsDockSide === "bottom" ? "row-resize" : "col-resize") : "default",
+        hovering ? (this.devtoolsDockSide === "bottom" ? "ns-resize" : "ew-resize") : "default",
       );
       this.render();
     },
