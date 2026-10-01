@@ -28,8 +28,7 @@ import { findOwner } from "@zenbu-labs/pixel/terminal";
 import type { Direction, Terminal, TerminalCheck } from "@zenbu-labs/pixel/terminal";
 import { actionCommand } from "./action";
 import { control } from "./control";
-import { setupCommand } from "./editors";
-import { ensureSetup, linkSkills, markSetupDone } from "./setup";
+import { ensureSetup, setupCommand } from "./setup";
 import { commandHelp, helpTopics, rootHelp } from "./help";
 import { browsers, describe, recordKey } from "./instances";
 import type { Browser } from "./instances";
@@ -716,13 +715,7 @@ async function main(): Promise<number> {
     await lsCommand((await currentTerminal()).terminal, all, json);
     return 0;
   }
-  if (command === "setup") {
-    const sandbox = apparmorSetup(electronBinary());
-    linkSkills();
-    const editors = setupCommand();
-    markSetupDone();
-    return editors !== 0 ? editors : sandbox;
-  }
+  if (command === "setup") return setupCommand(electronBinary());
   if (command === "upgrade") return upgradeCommand();
   if (command === "config") return configCommand(args);
   if (command === "claude-bridge") return claudeBridgeCommand(args);

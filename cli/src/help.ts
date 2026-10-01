@@ -50,7 +50,6 @@ Options:
     body: `
 Sets up configuration to make terminal-browser work best, this includes:
 - installing agent skills
-- enabling configuration settings in terminals that is required for terminal-browser to work
 
 `,
   },
