@@ -14,6 +14,7 @@ import { registerScheme } from "./pages/scheme";
 app.commandLine.appendSwitch("disable-renderer-backgrounding");
 app.commandLine.appendSwitch("disable-background-timer-throttling");
 app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
+app.commandLine.appendSwitch("enable-features", "WebMCP");
 
 if (process.env.TERMINAL_BROWSER_DISABLE_GPU === "1") {
   app.commandLine.appendSwitch("disable-gpu");
