@@ -1,10 +1,19 @@
 // we cannot use libraries inside the claude code sandbox, hence this gross code
 
 
-export type Placed = { imageId: number; cols: number; rows: number }
+export type Frame = {
+  shm: string
+  format: 'rgba' | 'rgb'
+  width: number
+  height: number
+  generation: number
+  cols: number
+  rows: number
+}
 
 export type BridgeState = {
-  placed: Placed | null
+  version: number
+  frame: Frame | null
   title: string
   url: string | null
   alive: boolean
@@ -21,8 +30,22 @@ export type InputMessage = { type: 'input'; events: unknown[] }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
 
+export const isFrame = (value: unknown): value is Frame =>
+  isRecord(value)
+  && typeof value.shm === 'string'
+  && (value.format === 'rgba' || value.format === 'rgb')
+  && Number.isInteger(value.width)
+  && Number.isInteger(value.height)
+  && Number.isInteger(value.generation)
+  && Number.isInteger(value.cols)
+  && Number.isInteger(value.rows)
+
 export const isBridgeState = (value: unknown): value is BridgeState =>
-  isRecord(value) && typeof value.alive === 'boolean' && 'placed' in value
+  isRecord(value)
+  && Number.isInteger(value.version)
+  && typeof value.alive === 'boolean'
+  && 'frame' in value
+  && (value.frame === null || isFrame(value.frame))
 
 export const isLaunchReport = (value: unknown): value is LaunchReport =>
   isRecord(value) && (typeof value.port === 'number' || typeof value.error === 'string')

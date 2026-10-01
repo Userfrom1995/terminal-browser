@@ -94,6 +94,30 @@ pub(crate) fn placed(image_id: u32, cols: u32, rows: u32, cell: Option<(u32, u32
     json!({ "type": "placed", "imageId": image_id, "cols": cols, "rows": rows, "cell": cell.map(|(w, h)| [w, h]) })
 }
 
+pub(crate) struct HostFrame<'a> {
+    pub(crate) shm: &'a str,
+    pub(crate) width: u32,
+    pub(crate) height: u32,
+    pub(crate) generation: u64,
+    pub(crate) cols: u32,
+    pub(crate) rows: u32,
+    pub(crate) cell: Option<(u32, u32)>,
+}
+
+pub(crate) fn frame(frame: HostFrame<'_>) -> Value {
+    json!({
+        "type": "frame",
+        "shm": frame.shm,
+        "format": "rgba",
+        "width": frame.width,
+        "height": frame.height,
+        "generation": frame.generation,
+        "cols": frame.cols,
+        "rows": frame.rows,
+        "cell": frame.cell.map(|(w, h)| [w, h]),
+    })
+}
+
 impl HostState {
     pub(crate) fn fill_pixel_size(&mut self) {
         if let Some((cw, ch)) = self.cell {
@@ -502,6 +526,79 @@ mod tests {
         );
         assert!(sent[1].contains("\"pointer\""), "{sent:?}");
         drop(term);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    fn fake_embedder(dir: &std::path::Path) -> (String, std::sync::mpsc::Receiver<String>) {
+        let socket = dir.join("embed.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let Ok((connection, _)) = listener.accept() else { return };
+            let mut reader = BufReader::new(connection);
+            let mut line = String::new();
+            if reader.read_line(&mut line).unwrap_or(0) == 0 {
+                return;
+            }
+            tx.send(line.clone()).unwrap();
+            let init = json!({ "type": "init", "cols": 40, "rows": 10, "width": 400, "height": 200,
+                "cell": [10, 20], "transport": "host", "imageId": 77, "focused": true });
+            send(reader.get_mut(), &init).unwrap();
+            line.clear();
+            while reader.read_line(&mut line).map(|n| n > 0).unwrap_or(false) {
+                tx.send(line.clone()).unwrap();
+                line.clear();
+            }
+        });
+        (socket.to_string_lossy().into_owned(), rx)
+    }
+
+    #[test]
+    fn an_embedded_terminal_on_the_host_transport_hands_frames_over_as_shared_memory_and_leaves_the_tty_alone() {
+        use crate::terminal::Terminal;
+        let dir = std::env::temp_dir().join(format!("pixel-embed-host-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let (socket, lines) = fake_embedder(&dir);
+        let tty = dir.join("fake-tty");
+        std::fs::write(&tty, b"").unwrap();
+
+        let mut term = Terminal::join_embedded(&socket, "pane-1", "hello", tty.to_str().unwrap()).unwrap();
+        let joined: Value = serde_json::from_str(&lines.recv_timeout(Duration::from_secs(2)).unwrap()).unwrap();
+        assert_eq!(joined["type"], "join");
+        assert!(term.is_embedded());
+        assert_eq!(term.cell_size().unwrap(), Some((10, 20)));
+
+        let mut canvas = crate::canvas::Canvas::new(25, 30);
+        canvas.pixels[..4].copy_from_slice(&[9, 8, 7, 255]);
+        let whole = [crate::surfaces::Rect::sized(canvas.width, canvas.height)];
+        let frame = crate::canvas::Frame { canvas: &canvas, premultiplied: false, changed: &[], repainted: &whole, opaque: &[], ui_over_surfaces: &[] };
+        term.draw(frame).unwrap();
+        term.draw(frame).unwrap();
+
+        let first: Value = serde_json::from_str(&lines.recv_timeout(Duration::from_secs(2)).unwrap()).unwrap();
+        let second: Value = serde_json::from_str(&lines.recv_timeout(Duration::from_secs(2)).unwrap()).unwrap();
+        assert_eq!(first["type"], "frame", "{first}");
+        assert_eq!(first["format"], "rgba");
+        assert_eq!(first["width"], 25);
+        assert_eq!(first["height"], 30);
+        assert_eq!(first["cols"], 3);
+        assert_eq!(first["rows"], 2);
+        assert_eq!(first["generation"], 0);
+        assert_eq!(second["generation"], 1);
+        assert_ne!(first["shm"], second["shm"], "every frame is a fresh object");
+        let name = first["shm"].as_str().unwrap();
+        assert!(name.starts_with("/px-") && name.len() <= 30, "{name} must fit macOS's 30 byte shm names");
+        let object = rustix::shm::open(name, rustix::shm::OFlags::RDONLY, rustix::fs::Mode::empty()).unwrap();
+        // macOS rounds a shared-memory object up to whole pages
+        assert!(rustix::fs::fstat(&object).unwrap().st_size >= 25 * 30 * 4);
+
+        drop(term);
+        assert_eq!(std::fs::read(&tty).unwrap(), b"", "nothing may be written to the host's tty");
+        assert!(
+            rustix::shm::open(name, rustix::shm::OFlags::RDONLY, rustix::fs::Mode::empty()).is_err(),
+            "dropping the terminal unlinks the objects the terminal never read"
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

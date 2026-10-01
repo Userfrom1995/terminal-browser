@@ -461,6 +461,7 @@ impl Terminal {
         terminal.transport = match state.transport.as_deref() {
             Some("file") => FrameTransport::File,
             Some("shm") | Some("shared") => FrameTransport::Shared,
+            Some("host") => FrameTransport::Host,
             _ => FrameTransport::Inline,
         };
         terminal.image_id = state.image_id.unwrap_or_else(|| frame_image_id(true));
@@ -800,6 +801,9 @@ impl Terminal {
     }
 
     fn draw_embedded(&mut self, canvas: &Canvas) -> io::Result<usize> {
+        if self.transport == FrameTransport::Host {
+            return self.hand_frame_to_host(canvas);
+        }
         let shrank = self
             .last_frame_size
             .is_some_and(|(w, h)| canvas.width < w || canvas.height < h);
@@ -825,6 +829,23 @@ impl Terminal {
             self.host_send(crate::hosted::placed(self.image_id, cols, rows, self.cell))?;
         }
         Ok(frame.len())
+    }
+
+    fn hand_frame_to_host(&mut self, canvas: &Canvas) -> io::Result<usize> {
+        let (cols, rows) = self.grid_for(canvas);
+        let generation = self.frame_seq;
+        self.frame_seq += 1;
+        let shm = self.hand_off_shm(&canvas.pixels)?;
+        self.host_send(crate::hosted::frame(crate::hosted::HostFrame {
+            shm: &shm,
+            width: canvas.width,
+            height: canvas.height,
+            generation,
+            cols,
+            rows,
+            cell: self.cell,
+        }))?;
+        Ok(canvas.pixels.len())
     }
 
    
@@ -1527,6 +1548,7 @@ enum FrameTransport {
     File,
     Shared,
     Inline,
+    Host,
 }
 
 static NEXT_TERMINAL_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -1667,6 +1689,10 @@ impl Drop for Terminal {
             RESIZE_WAKE_FDS[slot].store(-1, std::sync::atomic::Ordering::Release);
         }
         if self.is_embedded() {
+            if self.transport == FrameTransport::Host {
+                self.payloads.remove_all();
+                return;
+            }
             // The host keeps its terminal; only our image goes.
             let _ = self.io.out().write_all(&crate::kitty::kitty_delete_one(self.image_id));
             let _ = self.io.out().flush();

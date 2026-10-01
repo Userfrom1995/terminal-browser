@@ -44,7 +44,7 @@ import { claudeBridgeCommand } from "./claude-bridge";
 import { configCommand } from "./config";
 
 const DIST_ROOT = process.env.TERMINAL_BROWSER_DIST_ROOT ?? null;
-const CAPABILITIES = ["embedding"] as const;
+const CAPABILITIES = ["embedding", "image-frames"] as const;
 delete process.env.ELECTRON_RUN_AS_NODE;
 
 function fail(message: string): never {

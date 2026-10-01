@@ -105,7 +105,7 @@ impl Terminal {
 
     pub(crate) fn patch_medium(&self) -> Option<crate::kitty::Medium> {
         match self.transport {
-            FrameTransport::Inline => None,
+            FrameTransport::Inline | FrameTransport::Host => None,
             FrameTransport::Shared => Some(crate::kitty::Medium::Shared),
             FrameTransport::File => Some(crate::kitty::Medium::Temporary),
         }
@@ -129,7 +129,7 @@ impl Terminal {
 
     pub(crate) fn hand_off_frame(&mut self, pixels: &[u8]) -> io::Result<Option<(crate::kitty::Medium, String)>> {
         Ok(match self.transport {
-            FrameTransport::Inline => None,
+            FrameTransport::Inline | FrameTransport::Host => None,
             FrameTransport::Shared => Some((crate::kitty::Medium::Shared, self.hand_off_shm(pixels)?)),
             FrameTransport::File => Some((crate::kitty::Medium::File, self.write_frame_file(pixels)?)),
         })
