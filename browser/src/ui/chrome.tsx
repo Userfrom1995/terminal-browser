@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Box, DevTools, Text, WebView } from "@zenbu-labs/pixel";
-import type { EngineInfo, Surface } from "@zenbu-labs/pixel";
+import type { EngineInfo, Rgba, Surface } from "@zenbu-labs/pixel";
 import type { WebViewState } from "@zenbu-labs/pixel";
 import { Icon } from "./icons";
 import type { IconName } from "./icons";
@@ -58,6 +58,7 @@ export function Chrome({
   tabActions,
   devtools,
   profiling,
+  grabActive,
 }: {
   state: WebViewState;
   actions: ChromeActions;
@@ -81,6 +82,7 @@ export function Chrome({
   tabActions: TabActions;
   devtools: DevtoolsView | null;
   profiling: boolean;
+  grabActive: boolean;
 }) {
   const theme = useMemo(() => makeTheme(colors), [colors]);
   const progress = useProgress(state.loading);
@@ -110,6 +112,7 @@ export function Chrome({
             tabs={tabs}
             record={record}
             profiling={profiling}
+            grabActive={grabActive}
           />
         ))}
       <BrowserTabContents
@@ -267,6 +270,7 @@ function Toolbar({
   tabs,
   record,
   profiling,
+  grabActive,
 }: {
   state: WebViewState;
   actions: ChromeActions;
@@ -275,6 +279,7 @@ function Toolbar({
   tabs: TabRow[];
   record: RecordView | null;
   profiling: boolean;
+  grabActive: boolean;
 }) {
   const rem = layout.rem;
   const stopIcon = useStopIcon(state.loading);
@@ -283,6 +288,7 @@ function Toolbar({
     layout.width -
     rem * 0.8 -
     rem * 3.3 -
+    rem * 3.5 -
     (nav ? rem * 3.5 : 0) -
     (record ? rem * 7.25 : 0) -
     (profiling ? rem * 6.5 : 0);
@@ -329,6 +335,15 @@ function Toolbar({
         url={state.url}
         theme={theme}
       />
+      <ToolbarButton
+        icon="select"
+        enabled
+        active={grabActive}
+        rem={rem}
+        theme={theme}
+        onClick={actions.grab}
+      />
+      <ToolbarButton icon="more" enabled rem={rem} theme={theme} onClick={actions.tabMenu} />
       {record && <RecordToolbarPill view={record} actions={actions} rem={rem} theme={theme} />}
       {profiling && <ProfilingPill actions={actions} rem={rem} theme={theme} />}
     </Box>
@@ -622,19 +637,24 @@ function DevtoolsPane({
   );
 }
 
+const GRAB_ACTIVE: Rgba = [0xb3, 0x45, 0xa0, 255];
+
 function ToolbarButton({
   icon,
   enabled,
+  active = false,
   rem,
   theme,
   onClick,
 }: {
   icon: IconName;
   enabled: boolean;
+  active?: boolean;
   rem: number;
   theme: Theme;
   onClick(): void;
 }) {
+  const color = !enabled ? theme.disabled : active ? GRAB_ACTIVE : theme.muted;
   return (
     <Box
       style={{
@@ -643,12 +663,13 @@ function ToolbarButton({
         alignItems: "center",
         justifyContent: "center",
         cornerRadius: rem * 0.3,
+        background: active ? theme.hover : undefined,
         hoverBackground: enabled ? theme.hover : undefined,
         flexShrink: 0,
       }}
       onClick={enabled ? onClick : undefined}
     >
-      <Icon icon={icon} size={rem * 1.1} color={enabled ? theme.muted : theme.disabled} />
+      <Icon icon={icon} size={rem * 1.1} color={color} />
     </Box>
   );
 }

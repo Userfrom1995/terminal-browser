@@ -144,6 +144,7 @@ export interface ChromeActions {
   tabClose(id: number): void;
   tabNew(): void;
   tabMenu(): void;
+  grab(): void;
   newTabQuery(text: string): void;
   newTabSubmit(text: string): void;
   newTabPick(index: number): void;

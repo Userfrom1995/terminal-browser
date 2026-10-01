@@ -257,7 +257,6 @@ class Session {
   private grabs = new Map<number, Grab>();
   private copyWatchers = new Map<number, CopyOnSelect>();
   private readonly copyOnSelect: boolean;
-  private readonly grabIcon = bundledAsset(path.join("react-grab", "logo.png"));
   private readonly inspectIcon = bundledAsset(path.join("chromium", "logo.png"));
   private readonly agentPanes: AgentPaneFinder;
   private shownRecord: RecordSession | null = null;
@@ -548,6 +547,7 @@ class Session {
         tabActions={this.tabActions}
         devtools={this.devtoolsView()}
         profiling={this.profiling}
+        grabActive={this.activeGrab()?.active ?? false}
       />,
     );
   }
@@ -581,6 +581,7 @@ class Session {
     tabClose: (id) => this.closeOrShutdown(id),
     tabNew: () => this.openNewTabModal(),
     tabMenu: () => this.toggleToolbarMenu(),
+    grab: () => void this.toggleGrab(),
     newTabQuery: (text) => this.newTabQuery(text),
     newTabSubmit: (text) => {
       this.closeNewTabModal();
@@ -1202,6 +1203,7 @@ class Session {
     if (!grab) {
       grab = new Grab(handle, {
         selected: (content) => void this.sendGrab(content),
+        changed: () => this.render(),
       });
       this.grabs.set(tab.id, grab);
     }
@@ -1240,13 +1242,12 @@ class Session {
       label: this.activeGrab()?.active ? "Stop selection" : "Send to agent",
       enabled: true,
       shortcut: this.keymap.label("grab.toggle"),
-      icon: this.grabIcon ? { kind: "image", src: this.grabIcon } : undefined,
+      icon: { kind: "path", d: ICONS.select },
     };
   }
 
   private toolMenuItems(): PageMenuItem[] {
     return [
-      this.grabMenuItem(),
       {
         id: "record",
         label: this.activeRecord() ? "Complete recording" : "Record",
@@ -1299,6 +1300,7 @@ class Session {
             { id: "copy-link", label: "Copy link address", enabled: true, shortcut: "" },
           ]
         : []),
+      this.grabMenuItem(),
       ...this.toolMenuItems(),
     ];
     return { x: this.pageMenu.x, y: this.pageMenu.y, items };
