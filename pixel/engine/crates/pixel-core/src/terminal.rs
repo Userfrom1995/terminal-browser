@@ -1856,8 +1856,6 @@ fn parse_plain_bytes(buf: &[u8], kitty_active: bool) -> Option<(RawEvent, usize)
 
 fn nearest_shape_ghostty_macos_draws(shape: &str) -> &str {
     match shape {
-        "col-resize" => "ew-resize",
-        "row-resize" => "ns-resize",
         "nw-resize" | "ne-resize" => "n-resize",
         "sw-resize" | "se-resize" => "s-resize",
         "nwse-resize" | "nesw-resize" => "ns-resize",
@@ -2490,8 +2488,6 @@ mod tests {
         assert_eq!(nearest_shape_ghostty_macos_draws("nw-resize"), "n-resize");
         assert_eq!(nearest_shape_ghostty_macos_draws("nwse-resize"), "ns-resize");
         assert_eq!(nearest_shape_ghostty_macos_draws("nesw-resize"), "ns-resize");
-        assert_eq!(nearest_shape_ghostty_macos_draws("col-resize"), "ew-resize");
-        assert_eq!(nearest_shape_ghostty_macos_draws("row-resize"), "ns-resize");
         assert_eq!(nearest_shape_ghostty_macos_draws("ew-resize"), "ew-resize");
         assert_eq!(nearest_shape_ghostty_macos_draws("pointer"), "pointer");
     }
