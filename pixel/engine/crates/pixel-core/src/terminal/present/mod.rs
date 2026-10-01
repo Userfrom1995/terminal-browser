@@ -56,6 +56,10 @@ impl Identity {
             Identity::Unknown => false,
         }
     }
+    pub(crate) fn is_ghostty(self) -> bool {
+        matches!(self, Identity::Ghostty { .. })
+    }
+
     pub(super) fn deletes_before_replace(self) -> bool {
         matches!(self, Identity::Ghostty { .. })
     }

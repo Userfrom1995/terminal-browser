@@ -1364,6 +1364,12 @@ impl Terminal {
                 return Ok(());
             }
         }
+        // we may want to enable this on all terminals if they have behave like ghostty, but at the least kitty does not need this and it would be a downgrade on it
+        let shape = if cfg!(target_os = "macos") && self.identity.is_ghostty() {
+            nearest_shape_ghostty_macos_draws(shape)
+        } else {
+            shape
+        };
         self.io.out()
             .write_all(format!("\x1b]22;{shape}\x1b\\").as_bytes())?;
         self.io.out().flush()
@@ -1846,6 +1852,17 @@ fn parse_plain_bytes(buf: &[u8], kitty_active: bool) -> Option<(RawEvent, usize)
         return Some((RawEvent::Key(event), 1));
     }
     Some((RawEvent::Key(byte_key_event(b0)), 1))
+}
+
+fn nearest_shape_ghostty_macos_draws(shape: &str) -> &str {
+    match shape {
+        "col-resize" => "ew-resize",
+        "row-resize" => "ns-resize",
+        "nw-resize" | "ne-resize" => "n-resize",
+        "sw-resize" | "se-resize" => "s-resize",
+        "nwse-resize" | "nesw-resize" => "ns-resize",
+        _ => shape,
+    }
 }
 
 fn unrewrite_natural_editing(b: u8) -> Option<KeyEvent> {
@@ -2465,6 +2482,18 @@ mod tests {
         );
         let (_, _, mods, _, _) = parse_sgr_mouse(b"<28;1;1", true).unwrap();
         assert!(mods.shift && mods.alt && mods.ctrl && !mods.sup);
+    }
+
+    #[test]
+    fn diagonal_resize_shapes_fall_back_to_vertical_for_ghostty_macos() {
+        assert_eq!(nearest_shape_ghostty_macos_draws("se-resize"), "s-resize");
+        assert_eq!(nearest_shape_ghostty_macos_draws("nw-resize"), "n-resize");
+        assert_eq!(nearest_shape_ghostty_macos_draws("nwse-resize"), "ns-resize");
+        assert_eq!(nearest_shape_ghostty_macos_draws("nesw-resize"), "ns-resize");
+        assert_eq!(nearest_shape_ghostty_macos_draws("col-resize"), "ew-resize");
+        assert_eq!(nearest_shape_ghostty_macos_draws("row-resize"), "ns-resize");
+        assert_eq!(nearest_shape_ghostty_macos_draws("ew-resize"), "ew-resize");
+        assert_eq!(nearest_shape_ghostty_macos_draws("pointer"), "pointer");
     }
 
     #[test]
