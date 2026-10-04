@@ -94,7 +94,6 @@ export async function isBookmarked(url: string, scope?: BookmarkScope): Promise<
 const DEFAULT_PINS = [
   { url: "https://github.com", title: "GitHub" },
   { url: "https://developer.mozilla.org", title: "MDN Web Docs" },
-  { url: "http://localhost:3000", title: "Localhost" },
   { url: "https://www.reddit.com", title: "Reddit" },
 ];
 

@@ -105,7 +105,7 @@ test("listPins returns only pinned rows ordered by position", async () => {
   }
 });
 
-test("seedDefaultPins seeds four pins once and never overwrites", async () => {
+test("seedDefaultPins seeds three pins once and never overwrites", async () => {
   const { scope, cleanup } = tempScope();
   try {
     await seedDefaultPins(scope);
@@ -115,17 +115,16 @@ test("seedDefaultPins seeds four pins once and never overwrites", async () => {
       [
         ["https://github.com", "GitHub"],
         ["https://developer.mozilla.org", "MDN Web Docs"],
-        ["http://localhost:3000", "Localhost"],
         ["https://www.reddit.com", "Reddit"],
       ],
     );
     assert.deepEqual(
       pins.map((row) => row.position),
-      [0, 1, 2, 3],
+      [0, 1, 2],
     );
 
     await seedDefaultPins(scope);
-    assert.equal((await listBookmarks(scope)).length, 4);
+    assert.equal((await listBookmarks(scope)).length, 3);
   } finally {
     cleanup();
   }
