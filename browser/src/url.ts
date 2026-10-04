@@ -49,6 +49,16 @@ export function normalizeUrl(value: string, cwd: string | undefined, search: Sea
   return search(input);
 }
 
+// startUrl stays a parameter so this module never imports the scheme layer.
+export function resolveDefaultUrl(
+  env: NodeJS.ProcessEnv,
+  homeDefault: string,
+  startUrl: string,
+): string {
+  if (env.TERMINAL_BROWSER_START_PAGE === "0") return "about:blank";
+  return homeDefault === "blank" ? "about:blank" : startUrl;
+}
+
 const HAS_AUTHORITY = /^[a-z][a-z0-9+.-]*:\/\//i;
 const SCHEMES_WITHOUT_HOST = /^(?:data|mailto|tel|about|blob|chrome|view-source):/i;
 

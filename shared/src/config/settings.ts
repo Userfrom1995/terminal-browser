@@ -60,6 +60,14 @@ export const SETTINGS = {
       { value: SUGGESTIONS_OFF, name: "Off", logo: null },
     ],
   }),
+  "home.default": setting({
+    group: "general",
+    label: "Home page on launch",
+    hint: "Open the home page for new windows and tabs, or a blank page instead.",
+    schema: z.enum(["start", "blank"]),
+    default: "start",
+    choices: [plain("start", "Home page"), plain("blank", "Blank page")],
+  }),
   "telemetry.usage": setting({
     group: "general",
     label: "Disable anonymous telemetry",

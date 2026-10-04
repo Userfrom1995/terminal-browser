@@ -67,7 +67,7 @@ import type {
   ToastView,
   ReleaseView,
 } from "../ui/types";
-import { displayUrl, normalizeUrl, searchOrUrl, searchUrlFor } from "../url";
+import { displayUrl, normalizeUrl, resolveDefaultUrl, searchOrUrl, searchUrlFor } from "../url";
 import type { SearchUrl } from "../url";
 import { START_URL } from "../pages/scheme";
 import type { PageContext } from "../pages/scheme";
@@ -266,7 +266,7 @@ class Session {
 
   constructor(ctx: SessionContext) {
     this.ctx = ctx;
-    this.defaultUrl = ctx.env.TERMINAL_BROWSER_START_PAGE === "1" ? START_URL : "about:blank";
+    this.defaultUrl = resolveDefaultUrl(ctx.env, this.settings.get("home.default"), START_URL);
     const socket = ctx.env[TERMINAL_SOCKET_ENV];
     this.terminal = socket ? socketTerminal(socket) : detect(ctx.env);
     this.marker = `terminal-browser:${ctx.key}`;
