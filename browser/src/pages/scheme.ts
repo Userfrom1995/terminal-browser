@@ -3,8 +3,11 @@ import path from "node:path";
 
 import { protocol } from "electron";
 
+import { addBookmark, listBookmarks, removeBookmark, setPinned } from "shared";
+
 import { renderMarkdown } from "./markdown";
-import { renderStartPage } from "./start";
+import { collectStartData, renderStartPage } from "./start";
+import { parseBookmarkBody, routeStartApi } from "./start-api";
 import type { Theme } from "../ui/theme";
 
 
@@ -51,8 +54,41 @@ export function registerScheme() {
 export function servePages(context: () => PageContext) {
   protocol.handle(SCHEME, async (request) => {
     const url = new URL(request.url);
-    if (url.host === "start") return renderStartPage(url, context());
-    return new Response("", { status: 404 });
+    if (url.host !== "start") return new Response("", { status: 404 });
+    const route = routeStartApi(request.method, url);
+    switch (route.kind) {
+      case "page":
+        return renderStartPage(url, context());
+      case "data":
+        return json(await collectStartData(context().cwd));
+      case "bookmark-create": {
+        let body: unknown;
+        try {
+          body = await request.json();
+        } catch {
+          return json({ error: "request body is not valid JSON" }, 400);
+        }
+        const parsed = parseBookmarkBody(body);
+        if (!parsed.success) return json({ error: "invalid bookmark body" }, 400);
+        const created = await addBookmark({
+          url: parsed.data.url,
+          title: parsed.data.title,
+          favicon: parsed.data.favicon,
+        });
+        if (parsed.data.pinned === undefined) return json(created);
+        await setPinned(created.url, parsed.data.pinned);
+        const current = (await listBookmarks()).find((row) => row.url === created.url) ?? created;
+        return json(current);
+      }
+      case "bookmark-delete": {
+        const existing = (await listBookmarks()).find((row) => row.id === route.id);
+        if (!existing) return json({ error: "bookmark not found" }, 404);
+        await removeBookmark(route.id);
+        return json({ ok: true, id: route.id });
+      }
+      case "not-found":
+        return json({ error: "not found" }, 404);
+    }
   });
   protocol.handle(DOC_SCHEME, async (request) => {
     const url = new URL(request.url);
@@ -90,8 +126,8 @@ export function html(markup: string): Response {
   return new Response(markup, { headers: { "content-type": "text/html; charset=utf-8" } });
 }
 
-export function json(value: unknown): Response {
-  return new Response(JSON.stringify(value), { headers: { "content-type": "application/json" } });
+export function json(value: unknown, status = 200): Response {
+  return new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json" } });
 }
 
 function css(color: Rgba | undefined, fallback: string): string {

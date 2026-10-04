@@ -6,9 +6,12 @@ import { promisify } from "node:util";
 
 import { z } from "zod";
 
+import { ConfigStore, SETTINGS_FILE, SHORTCUTS_FILE, listBookmarks, listPins } from "shared";
+
 import type { Theme } from "../ui/theme";
 import { documentUrl, escape, html, json, pageColors } from "./scheme";
 import type { PageContext } from "./scheme";
+import { resolveSearchEngine } from "./start-api";
 
 
 
@@ -33,13 +36,29 @@ const MAX_DOCUMENTS = 8;
 const PORT_NOISE = ["ControlCe", "rapportd", "sharingd", "agent-bro", "identitys", "Electron", "terminal-"];
 
 export async function renderStartPage(url: URL, context: PageContext): Promise<Response> {
-  const data = await collect(context.cwd);
+  const data = await collectStartData(context.cwd);
   return url.searchParams.has("data") ? json(data) : html(render(data, context.theme));
 }
 
-async function collect(cwd: string) {
-  const [ports, documents, pr] = await Promise.all([listeningPorts(), recentDocuments(cwd), openPullRequest(cwd)]);
-  return { ports, documents, pr };
+export async function collectStartData(cwd: string) {
+  const [ports, documents, pr, pins, bookmarks] = await Promise.all([
+    listeningPorts(),
+    recentDocuments(cwd),
+    openPullRequest(cwd),
+    // a broken page db must not take down the legacy dev-context poller
+    listPins().catch(() => []),
+    listBookmarks().catch(() => []),
+  ]);
+  return { ports, documents, pr, pins, bookmarks, searchEngine: activeSearchEngine() };
+}
+
+function activeSearchEngine(): string {
+  try {
+    const settings = new ConfigStore({ settings: SETTINGS_FILE, shortcuts: SHORTCUTS_FILE }).load().settings;
+    return resolveSearchEngine(settings?.["search.engine"]);
+  } catch {
+    return resolveSearchEngine(undefined);
+  }
 }
 
 async function listeningPorts(): Promise<Port[]> {
@@ -118,7 +137,7 @@ function ago(ms: number): string {
   return `${Math.round(hours / 24)}d`;
 }
 
-function render(data: Awaited<ReturnType<typeof collect>>, theme: Theme | null): string {
+function render(data: Awaited<ReturnType<typeof collectStartData>>, theme: Theme | null): string {
   const { fg, muted, accent, hairline } = pageColors(theme);
   const link = (href: string, text: string) => `<a href="${escape(href)}" target="_blank">${escape(text)}</a>`;
   const section = (title: string, rows: string[]) =>
