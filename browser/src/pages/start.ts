@@ -11,7 +11,7 @@ import { ConfigStore, SETTINGS_FILE, SHORTCUTS_FILE, engineBySearch, listBookmar
 import type { Theme } from "../ui/theme";
 import { documentUrl, escape, html, json, pageColors } from "./scheme";
 import type { PageContext } from "./scheme";
-import { resolveSearchEngine } from "./start-api";
+import { pinTileHtml, resolveSearchEngine } from "./start-api";
 
 
 
@@ -33,6 +33,7 @@ const exec = promisify(execFile);
 const RECENT_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 const MAX_PORTS = 10;
 const MAX_DOCUMENTS = 8;
+const MAX_PINS = 8;
 const PORT_NOISE = ["ControlCe", "rapportd", "sharingd", "agent-bro", "identitys", "Electron", "terminal-"];
 
 export async function renderStartPage(url: URL, context: PageContext): Promise<Response> {
@@ -147,6 +148,14 @@ function render(data: Awaited<ReturnType<typeof collectStartData>>, theme: Theme
 <h1><span class="prompt">&gt;_</span> terminal-browser</h1>
 <form id="search-form" role="search"><input id="search-input" name="q" type="search" autofocus autocomplete="off" spellcheck="false" placeholder="Search or enter URL..." aria-label="Search or enter URL" data-search-template="${escape(data.searchEngine)}"${suggest ? ` data-suggest-template="${escape(suggest)}"` : ""}><ul id="search-suggest" role="listbox" aria-label="Search suggestions" hidden></ul></form>
 </header>`;
+  const gridPins = data.pins.slice(0, MAX_PINS);
+  const pinsSection = `<section aria-label="Pinned sites" id="pins">
+<div class="pins-head"><h2>PINNED SITES</h2><div class="pins-tools"><span class="hint">1–8 open · ⇧ new tab</span><button id="pins-edit-toggle" type="button" aria-pressed="false" title="Edit pins (e)">[e] edit</button></div></div>
+<div id="pins-grid">${gridPins.map((pin, index) => pinTileHtml(pin, index)).join("")}</div>
+<p class="empty" id="pins-empty"${gridPins.length > 0 ? " hidden" : ""}>no pins yet — press e to edit pins</p>
+<form id="pin-add-form"><input id="pin-url" type="url" autocomplete="off" spellcheck="false" placeholder="https://example.com" aria-label="Pin URL"><input id="pin-label" type="text" autocomplete="off" spellcheck="false" placeholder="Label" aria-label="Pin label"><button type="submit">Add pin</button></form>
+<script id="pins-data" type="application/json">${JSON.stringify(gridPins).replace(/</g, "\\u003c")}</script>
+</section>`;
   const body =
     section("Pull request", data.pr ? [`<li>${link(data.pr.url, `#${data.pr.number} ${data.pr.title}`)}</li>`] : []) +
     section(
@@ -180,10 +189,36 @@ function render(data: Awaited<ReturnType<typeof collectStartData>>, theme: Theme
   #search-suggest { position: absolute; top: 100%; left: 0; right: 0; text-align: left; background: ${field}; border: 1px solid ${hairline}; border-radius: 0 0 10px 10px; overflow: hidden; z-index: 1; }
   #search-suggest li { display: block; padding: 8px 16px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #search-suggest li[aria-selected="true"] { color: ${accent}; }
+  #pins { margin: 0 0 26px; }
+  .pins-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+  .pins-head h2 { margin: 0; }
+  .pins-tools { display: flex; align-items: center; gap: 10px; }
+  .hint { font-size: 11px; color: ${muted}; white-space: nowrap; }
+  #pins-edit-toggle { font: inherit; font-size: 11px; color: ${muted}; background: transparent; border: 1px solid ${hairline}; border-radius: 6px; padding: 2px 8px; cursor: pointer; }
+  #pins-edit-toggle:hover { color: ${fg}; }
+  #pins-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  @media (max-width: 560px) { #pins-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .pin { position: relative; min-width: 0; }
+  .pin-link { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: ${field}; border: 1px solid ${hairline}; border-radius: 10px; color: ${fg}; }
+  .pin-tile { position: relative; flex: none; width: 32px; height: 32px; border-radius: 8px; background: ${hairline}; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; overflow: hidden; }
+  .pin-favicon { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: ${field}; }
+  .pin-text { display: flex; flex-direction: column; min-width: 0; }
+  .pin-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pin-host { color: ${muted}; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pin-key { margin-left: auto; flex: none; font-size: 11px; color: ${muted}; border: 1px solid ${hairline}; border-radius: 4px; padding: 0 5px; }
+  .pin-delete { display: none; position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; border-radius: 50%; border: 1px solid ${hairline}; background: ${field}; color: ${fg}; font-size: 13px; line-height: 1; cursor: pointer; }
+  body.editing-pins .pin-delete { display: block; }
+  #pin-add-form { display: none; gap: 8px; margin-top: 10px; }
+  body.editing-pins #pin-add-form { display: flex; }
+  #pin-add-form input { flex: 1; min-width: 0; font: inherit; font-size: 12px; color: ${fg}; background: ${field}; border: 1px solid ${hairline}; border-radius: 8px; padding: 8px 10px; outline: none; }
+  #pin-add-form input:focus { border-color: ${accent}; }
+  #pin-add-form button { font: inherit; font-size: 12px; color: ${fg}; background: ${field}; border: 1px solid ${hairline}; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
 </style></head>
 <body>
 ${hero}
+${pinsSection}
 ${body || `<p class="empty">no running servers, no recent documents, no open pull request</p>`}
+<p class="hint" id="home-foot">prefer a blank page? set home.default to blank in settings</p>
 <script>
 (() => {
   const input = document.getElementById("search-input");
@@ -308,14 +343,141 @@ ${body || `<p class="empty">no running servers, no recent documents, no open pul
     event.preventDefault();
     go(input.value, false);
   });
+  const typingTarget = (target) => target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || (target instanceof HTMLElement && target.isContentEditable);
   document.addEventListener("keydown", (event) => {
     if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey) return;
-    const target = event.target;
-    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return;
-    if (target instanceof HTMLElement && target.isContentEditable) return;
+    if (typingTarget(event.target)) return;
     if (document.activeElement === input) return;
     event.preventDefault();
     input.focus();
+  });
+  // pins grid: escapeTile/tileLetter/tileHost/tileFavicon/tileHtml mirror
+  // pinTileHtml + pinLetter/pinHost/pinFaviconSrc in start-api.ts — change both together
+  const grid = document.getElementById("pins-grid");
+  const pinsEmpty = document.getElementById("pins-empty");
+  const addForm = document.getElementById("pin-add-form");
+  const pinUrlInput = document.getElementById("pin-url");
+  const pinLabelInput = document.getElementById("pin-label");
+  const editToggle = document.getElementById("pins-edit-toggle");
+  const MAX_PINS = 8;
+  let pins = [];
+  try { pins = JSON.parse(document.getElementById("pins-data").textContent || "[]"); } catch {}
+  const escapeTile = (text) => String(text).replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c] || c));
+  const tileLetter = (title) => { const first = String(title).trim().charAt(0); return first ? first.toUpperCase() : "?"; };
+  const tileHost = (page) => { try { return new URL(page).host; } catch { return ""; } };
+  const tileFavicon = (page) => { try { const parsed = new URL(page); if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null; return parsed.protocol + "//" + parsed.host + "/favicon.ico"; } catch { return null; } };
+  const tileHtml = (pin, index) => {
+    const letter = escapeTile(tileLetter(pin.title));
+    const host = escapeTile(tileHost(pin.url));
+    const favicon = tileFavicon(pin.url);
+    const img = favicon === null ? "" : '<img class="pin-favicon" src="' + escapeTile(favicon) + '" alt="" loading="lazy" onerror="this.remove()">';
+    const label = escapeTile(pin.title);
+    return '<div class="pin" data-pin-id="' + pin.id + '"><a class="pin-link" id="pin-' + (index + 1) + '" data-pin-index="' + index + '" href="' + escapeTile(pin.url) + '"><span class="pin-tile" aria-hidden="true"><span class="pin-letter">' + letter + '</span>' + img + '</span><span class="pin-text"><span class="pin-label">' + label + '</span><span class="pin-host">' + host + '</span></span><span class="pin-key">' + (index + 1) + '</span></a><button class="pin-delete" type="button" data-pin-index="' + index + '" data-delete-pin="' + pin.id + '" aria-label="Delete ' + label + '" title="Delete ' + label + '">×</button></div>';
+  };
+  // grid swaps never touch the search form, so typed input survives; focus
+  // inside the grid is restored to the same slot and scroll is kept
+  const renderPins = (next) => {
+    pins = next.slice(0, MAX_PINS);
+    const x = scrollX;
+    const y = scrollY;
+    const active = document.activeElement instanceof HTMLElement ? document.activeElement.getAttribute("data-pin-index") : null;
+    grid.innerHTML = pins.map((pin, index) => tileHtml(pin, index)).join("");
+    pinsEmpty.hidden = pins.length !== 0;
+    if (active !== null) {
+      const same = grid.querySelector('[data-pin-index="' + active + '"]');
+      if (same instanceof HTMLElement) same.focus();
+    }
+    scrollTo(x, y);
+  };
+  const originPath = location.origin + location.pathname;
+  const apiBase = originPath.endsWith("/") ? originPath.slice(0, -1) : originPath;
+  const refreshPins = async () => {
+    const text = await data();
+    if (!text) return;
+    let parsed = null;
+    try { parsed = JSON.parse(text); } catch { return; }
+    if (!parsed || !Array.isArray(parsed.pins)) return;
+    window.__start = text;
+    renderPins(parsed.pins);
+  };
+  const gridBusy = () => document.body.classList.contains("editing-pins") || pinUrlInput.value !== "" || pinLabelInput.value !== "";
+  const setEditing = (on) => {
+    document.body.classList.toggle("editing-pins", on);
+    editToggle.setAttribute("aria-pressed", on ? "true" : "false");
+    if (on) pinUrlInput.focus();
+    else editToggle.focus();
+    maybeReload();
+  };
+  editToggle.addEventListener("click", () => setEditing(!document.body.classList.contains("editing-pins")));
+  addForm.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && event.target instanceof HTMLElement) event.target.blur();
+  });
+  addForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const url = pinUrlInput.value.trim();
+    if (!url) {
+      pinUrlInput.focus();
+      return;
+    }
+    const payload = { url: url, title: pinLabelInput.value.trim() || tileHost(url) || url, pinned: true };
+    try {
+      const response = await fetch(apiBase + "/api/bookmark", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) return;
+    } catch { return; }
+    pinUrlInput.value = "";
+    pinLabelInput.value = "";
+    pinUrlInput.focus();
+    await refreshPins();
+  });
+  grid.addEventListener("click", async (event) => {
+    const button = event.target instanceof HTMLElement ? event.target.closest("[data-delete-pin]") : null;
+    if (!button) return;
+    event.preventDefault();
+    try {
+      await fetch(apiBase + "/api/bookmark/" + encodeURIComponent(button.getAttribute("data-delete-pin") || ""), { method: "DELETE" });
+    } catch {}
+    await refreshPins();
+  });
+  const openPin = (pin, newTab) => {
+    if (newTab) {
+      const anchor = document.createElement("a");
+      anchor.href = pin.url;
+      anchor.target = "_blank";
+      anchor.rel = "noopener";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+    } else {
+      location.href = pin.url;
+    }
+  };
+  // grid keys mirror dispatchGridKey in start-api.ts: code-derived digit
+  // first so Shift+1 still opens pin 1 (in a new tab)
+  document.addEventListener("keydown", (event) => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (typingTarget(event.target)) return;
+    if (!list.hidden) return;
+    if (event.key === "Escape") {
+      if (document.body.classList.contains("editing-pins")) setEditing(false);
+      return;
+    }
+    const code = /^(?:Digit|Numpad)([1-8])$/.exec(event.code || "");
+    const digit = code ? code[1] : ((/^[1-8]$/.exec(event.key || "") || [])[0] || null);
+    if (digit !== null) {
+      const pin = pins[Number(digit) - 1];
+      if (!pin) return;
+      event.preventDefault();
+      openPin(pin, event.shiftKey);
+      return;
+    }
+    if (event.key === "e" || event.key === "E") {
+      event.preventDefault();
+      setEditing(!document.body.classList.contains("editing-pins"));
+    }
   });
   // dev servers come and go: refresh only when the lists changed, and never
   // steal typed input, focus, or scroll position to do it
@@ -333,17 +495,39 @@ ${body || `<p class="empty">no running servers, no recent documents, no open pul
   };
   let pending = false;
   const maybeReload = () => {
-    if (!pending || searchBusy()) return;
+    if (!pending || searchBusy() || gridBusy()) return;
     pending = false;
     reloadSoon();
   };
   input.addEventListener("input", maybeReload);
   input.addEventListener("blur", maybeReload);
+  pinUrlInput.addEventListener("input", maybeReload);
+  pinUrlInput.addEventListener("blur", maybeReload);
+  pinLabelInput.addEventListener("input", maybeReload);
+  pinLabelInput.addEventListener("blur", maybeReload);
+  const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  // pins-only changes swap the grid in place (renderPins preserves search
+  // input, focus, and scroll), so only other changes fall through to reload
+  const adoptPinsOnly = (oldText, freshText) => {
+    let oldData = null;
+    let freshData = null;
+    try { oldData = JSON.parse(oldText); freshData = JSON.parse(freshText); } catch { return false; }
+    if (!oldData || !freshData || !Array.isArray(oldData.pins) || !Array.isArray(freshData.pins)) return false;
+    if (sameJson(oldData.pins.slice(0, MAX_PINS), freshData.pins.slice(0, MAX_PINS))) return false;
+    const rest = (d) => { const copy = Object.assign({}, d); delete copy.pins; return copy; };
+    if (!sameJson(rest(oldData), rest(freshData))) return false;
+    renderPins(freshData.pins);
+    return true;
+  };
   setInterval(async () => {
     const fresh = await data();
     if (!fresh || fresh === window.__start) return;
+    if (adoptPinsOnly(window.__start, fresh)) {
+      window.__start = fresh;
+      return;
+    }
     window.__start = fresh;
-    if (searchBusy()) {
+    if (searchBusy() || gridBusy()) {
       pending = true;
       return;
     }

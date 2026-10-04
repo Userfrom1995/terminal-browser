@@ -87,3 +87,90 @@ export function suggestUrl(suggest: string | null, query: string): string | null
 export function parseSuggestResponse(body: string): string[] {
   return parseSuggestions(body);
 }
+
+export interface PinTileData {
+  id: number;
+  url: string;
+  title: string;
+}
+
+// scheme.ts escape() is canonical for page HTML but imports electron, so this
+// electron-free builder mirrors its mapping exactly.
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);
+}
+
+export function pinLetter(title: string): string {
+  const first = title.trim().charAt(0);
+  return first ? first.toUpperCase() : "?";
+}
+
+export function pinHost(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "";
+  }
+}
+
+export function pinFaviconSrc(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    return `${parsed.protocol}//${parsed.host}/favicon.ico`;
+  } catch {
+    return null;
+  }
+}
+
+// Server tile markup; the start-page script mirrors this string for grid
+// re-renders (see tileHtml in start.ts) — change both together.
+export function pinTileHtml(pin: PinTileData, index: number): string {
+  const letter = escapeHtml(pinLetter(pin.title));
+  const host = escapeHtml(pinHost(pin.url));
+  const favicon = pinFaviconSrc(pin.url);
+  const img =
+    favicon === null
+      ? ""
+      : `<img class="pin-favicon" src="${escapeHtml(favicon)}" alt="" loading="lazy" onerror="this.remove()">`;
+  const label = escapeHtml(pin.title);
+  return `<div class="pin" data-pin-id="${pin.id}"><a class="pin-link" id="pin-${index + 1}" data-pin-index="${index}" href="${escapeHtml(pin.url)}"><span class="pin-tile" aria-hidden="true"><span class="pin-letter">${letter}</span>${img}</span><span class="pin-text"><span class="pin-label">${label}</span><span class="pin-host">${host}</span></span><span class="pin-key">${index + 1}</span></a><button class="pin-delete" type="button" data-pin-index="${index}" data-delete-pin="${pin.id}" aria-label="Delete ${label}" title="Delete ${label}">×</button></div>`;
+}
+
+export interface GridKeyInput {
+  key: string;
+  code: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  altKey: boolean;
+  shiftKey: boolean;
+}
+
+export interface GridKeyContext {
+  typing: boolean;
+  overlayOpen: boolean;
+}
+
+export type GridKeyAction =
+  | { kind: "open-pin"; index: number; newTab: boolean }
+  | { kind: "toggle-edit" }
+  | { kind: "ignore" };
+
+// Pure dispatch behind the page 1–8/e keys; the page mirrors this order
+// (code-derived digit first so Shift+1 still opens pin 1 in a new tab).
+export function dispatchGridKey(event: GridKeyInput, context: GridKeyContext): GridKeyAction {
+  if (event.ctrlKey || event.metaKey || event.altKey) return { kind: "ignore" };
+  if (context.typing || context.overlayOpen) return { kind: "ignore" };
+  const code = /^(?:Digit|Numpad)([1-8])$/.exec(event.code);
+  if (code) return { kind: "open-pin", index: Number(code[1]) - 1, newTab: event.shiftKey };
+  const key = /^[1-8]$/.exec(event.key);
+  if (key) return { kind: "open-pin", index: Number(key[0]) - 1, newTab: event.shiftKey };
+  if (event.key.toLowerCase() === "e") return { kind: "toggle-edit" };
+  return { kind: "ignore" };
+}
+
+export function pinAddPayload(url: string, label: string): { url: string; title: string; pinned: true } | null {
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  return { url: trimmed, title: label.trim() || pinHost(trimmed) || trimmed, pinned: true };
+}
