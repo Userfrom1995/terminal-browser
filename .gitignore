@@ -55,3 +55,6 @@ dist-release/
 skill/build/
 
 /assets/react-grab/index.global.js
+
+# Local plans/scratch md (agent working dir, never commit)
+/tmp/
