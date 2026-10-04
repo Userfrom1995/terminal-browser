@@ -134,6 +134,7 @@ export interface ChromeActions {
   urlEdit(): void;
   urlEditCancel(): void;
   urlSubmit(text: string): void;
+  bookmarkToggle(): void;
   findChange(text: string): void;
   findNext(forward: boolean): void;
   findClose(): void;

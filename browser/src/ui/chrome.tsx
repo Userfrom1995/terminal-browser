@@ -59,6 +59,7 @@ export function Chrome({
   devtools,
   profiling,
   grabActive,
+  bookmarked,
 }: {
   state: WebViewState;
   actions: ChromeActions;
@@ -83,6 +84,7 @@ export function Chrome({
   devtools: DevtoolsView | null;
   profiling: boolean;
   grabActive: boolean;
+  bookmarked: boolean;
 }) {
   const theme = useMemo(() => makeTheme(colors), [colors]);
   const progress = useProgress(state.loading);
@@ -185,7 +187,7 @@ export function Chrome({
         </Box>
       )}
       {newTab && <NewTabCard view={newTab} actions={actions} layout={layout} theme={theme} />}
-      {urlEdit && <UrlCard state={state} actions={actions} layout={layout} theme={theme} />}
+      {urlEdit && <UrlCard state={state} actions={actions} layout={layout} theme={theme} bookmarked={bookmarked} />}
       {palette && <PaletteCard view={palette} actions={actions} layout={layout} theme={theme} />}
       {settings && (
         <SettingsCard view={settings} actions={actions.settings} layout={layout} theme={theme} />

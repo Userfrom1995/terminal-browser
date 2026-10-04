@@ -10,9 +10,14 @@ const { resolveDefaultUrl } = require("../dist/url.js");
 const START = "terminal-browser://start";
 const BLANK = "about:blank";
 
-test("only home.default ships; section toggles wait for M5 wiring", () => {
+test("section toggles ship alongside home.default", () => {
   for (const key of ["home.search", "home.pins", "home.bookmarks", "home.devSections"]) {
-    assert.equal(key in SETTINGS, false, `${key} must stay hidden until its section is wired`);
+    assert.equal(SETTINGS[key].group, "general", key);
+    assert.equal(SETTINGS[key].default, "on", key);
+    assert.equal(SETTINGS[key].schema.safeParse("on").success, true, key);
+    assert.equal(SETTINGS[key].schema.safeParse("off").success, true, key);
+    assert.equal(SETTINGS[key].schema.safeParse("nope").success, false, key);
+    assert.deepEqual(defaultSettings()[key], "on", key);
   }
   assert.equal(SETTINGS["home.default"].group, "general");
   assert.equal(SETTINGS["home.default"].default, "start");

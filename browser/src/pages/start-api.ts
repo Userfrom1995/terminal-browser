@@ -123,8 +123,40 @@ export function pinFaviconSrc(url: string): string | null {
   }
 }
 
+export function isWebUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+// Pins only ever point at web pages: bare hosts gain a scheme (http for
+// loopback, https otherwise) and anything non-http(s) is rejected outright,
+// so a persisted javascript: URL can never become a clickable tile.
+export function normalizePinUrl(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed || /\s/.test(trimmed)) return null;
+  let candidate = trimmed;
+  if (!HAS_AUTHORITY.test(candidate)) {
+    if (SCHEMES_WITHOUT_HOST.test(candidate)) return null;
+    const host = candidate.split(/[:/]/)[0].toLowerCase();
+    candidate = `${host === "localhost" || host === "127.0.0.1" ? "http" : "https"}://${candidate}`;
+  }
+  try {
+    const parsed = new URL(candidate);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
 // Server tile markup; the start-page script mirrors this string for grid
 // re-renders (see tileHtml in start.ts) — change both together.
+// Non-http(s) rows predate the allowlist and render inert: no href, so the
+// tile is a label rather than a link.
 export function pinTileHtml(pin: PinTileData, index: number): string {
   const letter = escapeHtml(pinLetter(pin.title));
   const host = escapeHtml(pinHost(pin.url));
@@ -134,7 +166,78 @@ export function pinTileHtml(pin: PinTileData, index: number): string {
       ? ""
       : `<img class="pin-favicon" src="${escapeHtml(favicon)}" alt="" loading="lazy" onerror="this.remove()">`;
   const label = escapeHtml(pin.title);
-  return `<div class="pin" data-pin-id="${pin.id}"><a class="pin-link" id="pin-${index + 1}" data-pin-index="${index}" href="${escapeHtml(pin.url)}"><span class="pin-tile" aria-hidden="true"><span class="pin-letter">${letter}</span>${img}</span><span class="pin-text"><span class="pin-label">${label}</span><span class="pin-host">${host}</span></span><span class="pin-key">${index + 1}</span></a><button class="pin-delete" type="button" data-pin-index="${index}" data-delete-pin="${pin.id}" aria-label="Delete ${label}" title="Delete ${label}">×</button></div>`;
+  const link = isWebUrl(pin.url)
+    ? `<a class="pin-link" id="pin-${index + 1}" data-pin-index="${index}" href="${escapeHtml(pin.url)}">`
+    : `<a class="pin-link" id="pin-${index + 1}" data-pin-index="${index}" aria-disabled="true">`;
+  return `<div class="pin" data-pin-id="${pin.id}">${link}<span class="pin-tile" aria-hidden="true"><span class="pin-letter">${letter}</span>${img}</span><span class="pin-text"><span class="pin-label">${label}</span><span class="pin-host">${host}</span></span></a><button class="pin-delete" type="button" data-pin-index="${index}" data-delete-pin="${pin.id}" aria-label="Delete ${label}" title="Delete ${label}">×</button></div>`;
+}
+
+export interface BookmarkRowData {
+  id: number;
+  url: string;
+  title: string;
+  age: string;
+}
+
+function bookmarkDomain(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
+// Relative age copy shared by server render and client re-renders; mirrors
+// ago() in start.ts (documents) so refreshed rows show real ages, never
+// "undefined".
+export function bookmarkAge(createdAtMs: number, nowMs: number = Date.now()): string {
+  const minutes = Math.round((nowMs - createdAtMs) / 60000);
+  if (minutes < 1) return "now";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `${hours}h`;
+  return `${Math.round(hours / 24)}d`;
+}
+
+export interface StoreBookmarkRow {
+  id: number;
+  url: string;
+  title: string;
+  createdAt: number;
+}
+
+// Raw store rows → render rows. refreshBookmarks maps through this same
+// shape (mirrored in page JS) so re-renders never show undefined ages.
+export function mapBookmarkRows(rows: StoreBookmarkRow[], nowMs: number = Date.now()): BookmarkRowData[] {
+  return rows.map((row) => ({
+    id: row.id,
+    url: row.url,
+    title: row.title,
+    age: bookmarkAge(row.createdAt, nowMs),
+  }));
+}
+
+// Server bookmark-row markup; the start-page script mirrors this string for
+// list re-renders (see bookmarkRowHtml in start.ts) — change both together.
+// Non-http(s) rows predate the URL checks and render inert: no href, so the
+// row is a label rather than a link (mirrors pinTileHtml).
+export function bookmarkRowHtml(bookmark: BookmarkRowData): string {
+  const label = escapeHtml(bookmark.title);
+  const domain = escapeHtml(bookmarkDomain(bookmark.url));
+  const age = escapeHtml(bookmark.age);
+  const search = escapeHtml(`${bookmark.title} ${bookmark.url}`.toLowerCase());
+  const link = isWebUrl(bookmark.url)
+    ? `<a class="bookmark-link" href="${escapeHtml(bookmark.url)}" data-bookmark-search="${search}">`
+    : `<a class="bookmark-link" aria-disabled="true" data-bookmark-search="${search}">`;
+  return `<li class="bookmark-row" data-bookmark-id="${bookmark.id}">${link}<span class="bookmark-title">${label}</span><span class="bookmark-domain">${domain}</span></a><span class="bookmark-age">${age}</span><button class="bookmark-delete" type="button" data-delete-bookmark="${bookmark.id}" aria-label="Delete ${label}" title="Delete ${label}">×</button></li>`;
+}
+
+// API failures arrive as terse codes; the page speaks in plain sentences so
+// raw transport words never reach user copy.
+export function bookmarkErrorMessage(status: number, error: string): string {
+  if (status === 404 || error === "bookmark not found") return "That bookmark was already deleted.";
+  if (status === 400) return "That entry needs a title and a valid web address.";
+  return "Could not reach the bookmarks store. Try again.";
 }
 
 export interface GridKeyInput {
@@ -154,11 +257,18 @@ export interface GridKeyContext {
 export type GridKeyAction =
   | { kind: "open-pin"; index: number; newTab: boolean }
   | { kind: "toggle-edit" }
+  | { kind: "exit-edit" }
   | { kind: "ignore" };
 
 // Pure dispatch behind the page 1–8/e keys; the page mirrors this order
 // (code-derived digit first so Shift+1 still opens pin 1 in a new tab).
-export function dispatchGridKey(event: GridKeyInput, context: GridKeyContext): GridKeyAction {
+// Escape while editing pins exits edit mode; elsewhere it is ignored so the
+// suggest dropdown keeps owning Escape.
+export function dispatchGridKey(
+  event: GridKeyInput,
+  context: GridKeyContext & { editing?: boolean },
+): GridKeyAction {
+  if (event.key === "Escape") return context.editing ? { kind: "exit-edit" } : { kind: "ignore" };
   if (event.ctrlKey || event.metaKey || event.altKey) return { kind: "ignore" };
   if (context.typing || context.overlayOpen) return { kind: "ignore" };
   const code = /^(?:Digit|Numpad)([1-8])$/.exec(event.code);
@@ -170,7 +280,7 @@ export function dispatchGridKey(event: GridKeyInput, context: GridKeyContext): G
 }
 
 export function pinAddPayload(url: string, label: string): { url: string; title: string; pinned: true } | null {
-  const trimmed = url.trim();
-  if (!trimmed) return null;
-  return { url: trimmed, title: label.trim() || pinHost(trimmed) || trimmed, pinned: true };
+  const normalized = normalizePinUrl(url);
+  if (!normalized) return null;
+  return { url: normalized, title: label.trim() || pinHost(normalized) || normalized, pinned: true };
 }

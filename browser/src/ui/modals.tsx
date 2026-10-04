@@ -154,11 +154,13 @@ export function UrlCard({
   actions,
   layout,
   theme,
+  bookmarked,
 }: {
   state: WebViewState;
   actions: ChromeActions;
   layout: ChromeLayout;
   theme: Theme;
+  bookmarked: boolean;
 }) {
   const rem = layout.rem;
   const cardW = Math.min(rem * 28, layout.width - rem * 4);
@@ -189,6 +191,20 @@ export function UrlCard({
           onChange={setValue}
           onSubmit={(text) => actions.urlSubmit(text)}
         />
+        <Box
+          style={{
+            width: rem * 1.5,
+            height: rem * 1.5,
+            alignItems: "center",
+            justifyContent: "center",
+            cornerRadius: rem * 0.3,
+            hoverBackground: theme.hover,
+            flexShrink: 0,
+          }}
+          onClick={actions.bookmarkToggle}
+        >
+          <Icon icon="star" size={rem * 1.1} color={bookmarked ? theme.accent : theme.muted} />
+        </Box>
       </Box>
     </ModalCard>
   );

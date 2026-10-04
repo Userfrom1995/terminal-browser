@@ -18,9 +18,24 @@ export const SCHEME = "terminal-browser";
 export const DOC_SCHEME = "terminal-browser-file";
 export const START_URL = `${SCHEME}://start`;
 
+export interface HomeVisibility {
+  search: boolean;
+  pins: boolean;
+  bookmarks: boolean;
+  devSections: boolean;
+}
+
+export const ALL_HOME_SECTIONS: HomeVisibility = {
+  search: true,
+  pins: true,
+  bookmarks: true,
+  devSections: true,
+};
+
 export interface PageContext {
   cwd: string;
   theme: Theme | null;
+  home: HomeVisibility;
 }
 
 type Rgba = [number, number, number, number];

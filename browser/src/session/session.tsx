@@ -16,17 +16,22 @@ import { detect } from "@zenbu-labs/pixel/terminal";
 import type { Pane, Terminal } from "@zenbu-labs/pixel/terminal";
 
 import {
+  addBookmark,
   commandLabel,
   ENGINE_LOG_FILE,
   fetchLatestRelease,
   installedChannel,
   installedVersion,
+  isBookmarked,
   lastUrl,
   listApps,
+  listBookmarks,
   listStep,
   maxFps,
+  removeBookmark,
   renderEnv,
   setLastUrl,
+  setPinned,
   settings as settingsTable,
   SETTINGS_FILE,
   SHORTCUTS_FILE,
@@ -251,6 +256,7 @@ class Session {
   private download: DownloadView | null = null;
   private downloadTimer: ReturnType<typeof setTimeout> | null = null;
   private toast: ToastView | null = null;
+  private bookmarkedCurrent = false;
   private profiling = false;
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
   private records = new Map<number, RecordSession>();
@@ -318,7 +324,10 @@ class Session {
           }
         },
         onActiveState: (state, urlChanged) => {
-          if (urlChanged) rememberUrl(state.url);
+          if (urlChanged) {
+            rememberUrl(state.url);
+            this.refreshBookmarkFlag(state.url);
+          }
           this.ensureCopyWatcher();
           if (Math.abs(state.zoom - this.lastZoom) > 0.001) this.showZoomHud(state.zoom);
           this.lastZoom = state.zoom;
@@ -548,6 +557,7 @@ class Session {
         devtools={this.devtoolsView()}
         profiling={this.profiling}
         grabActive={this.activeGrab()?.active ?? false}
+        bookmarked={this.bookmarkedCurrent}
       />,
     );
   }
@@ -565,6 +575,7 @@ class Session {
       this.closeUrlEdit();
       if (text.trim()) this.tabs.activeHandle?.loadURL(this.resolveInput(text));
     },
+    bookmarkToggle: () => void this.toggleBookmark(),
     findChange: (text) => this.tabs.activeHandle?.find(text),
     findNext: (forward) => this.tabs.activeHandle?.findNext(forward),
     findClose: () => this.closeFind(),
@@ -891,6 +902,9 @@ class Session {
       case "grab.toggle":
         void this.toggleGrab();
         return;
+      case "bookmark.toggle":
+        void this.toggleBookmark();
+        return;
       case "zoom.in":
         this.applyZoom(1);
         return;
@@ -1175,6 +1189,12 @@ class Session {
       case "open-link-tab":
         this.tabs.create(menu.linkURL);
         return;
+      case "bookmark-toggle":
+        void this.toggleBookmark();
+        return;
+      case "pin-add":
+        void this.pinActivePage();
+        return;
     }
   }
 
@@ -1223,6 +1243,66 @@ class Session {
       }
     } catch (error) {
       this.showToast(error instanceof Error ? error.message : String(error), "failed");
+    }
+  }
+
+  private refreshBookmarkFlag(url: string) {
+    if (!/^https?:\/\//.test(url)) {
+      if (this.bookmarkedCurrent) {
+        this.bookmarkedCurrent = false;
+        this.render();
+      }
+      return;
+    }
+    void isBookmarked(url)
+      .then((marked) => {
+        if (this.tabs.activeState?.url !== url || this.bookmarkedCurrent === marked) return;
+        this.bookmarkedCurrent = marked;
+        this.render();
+      })
+      .catch(() => {});
+  }
+
+  private async toggleBookmark() {
+    const state = this.tabs.activeState;
+    if (!state) return;
+    const url = state.url;
+    if (!/^https?:\/\//.test(url)) {
+      this.showToast("This page can't be bookmarked. Open a website first, then try again.", "failed");
+      return;
+    }
+    try {
+      const existing = (await listBookmarks()).find((row) => row.url === url);
+      if (existing) {
+        await removeBookmark(existing.id);
+        this.bookmarkedCurrent = false;
+        this.showToast("Removed the bookmark for this page.", "done");
+      } else {
+        await addBookmark({ url, title: state.title || url });
+        this.bookmarkedCurrent = true;
+        this.showToast("Bookmarked this page.", "done");
+      }
+    } catch {
+      this.showToast("Could not save that bookmark. Try again.", "failed");
+      return;
+    }
+    this.render();
+  }
+
+  private async pinActivePage() {
+    const state = this.tabs.activeState;
+    if (!state) return;
+    const url = state.url;
+    if (!/^https?:\/\//.test(url)) {
+      this.showToast("Only websites can be pinned. Open a website first, then try again.", "failed");
+      return;
+    }
+    try {
+      await addBookmark({ url, title: state.title || url });
+      await setPinned(url, true);
+      this.showToast("Pinned this page.", "done");
+    } catch {
+      this.showToast("Could not pin that page. Try again.", "failed");
     }
   }
 
@@ -1300,6 +1380,13 @@ class Session {
             { id: "copy-link", label: "Copy link address", enabled: true, shortcut: "" },
           ]
         : []),
+      {
+        id: "bookmark-toggle",
+        label: this.bookmarkedCurrent ? "Remove bookmark" : "Bookmark this page",
+        enabled: true,
+        shortcut: this.keymap.label("bookmark.toggle"),
+      },
+      { id: "pin-add", label: "Pin this page", enabled: true, shortcut: "" },
       this.grabMenuItem(),
       ...this.toolMenuItems(),
     ];
@@ -1562,7 +1649,16 @@ class Session {
 
   pageContext(): PageContext {
     const colors = this.root?.info.colors;
-    return { cwd: this.ctx.cwd, theme: colors ? makeTheme(colors) : null };
+    return {
+      cwd: this.ctx.cwd,
+      theme: colors ? makeTheme(colors) : null,
+      home: {
+        search: this.settings.get("home.search") !== "off",
+        pins: this.settings.get("home.pins") !== "off",
+        bookmarks: this.settings.get("home.bookmarks") !== "off",
+        devSections: this.settings.get("home.devSections") !== "off",
+      },
+    };
   }
 
   showsStartPage(): boolean {
