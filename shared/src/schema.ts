@@ -40,7 +40,19 @@ export const settings = sqliteTable("settings", {
   devtoolsFraction: real("devtools_fraction").notNull().default(0.4),
 });
 
+export const bookmarks = sqliteTable("bookmarks", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  url: text("url").notNull().unique(),
+  title: text("title").notNull(),
+  favicon: text("favicon"),
+  pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
+  position: integer("position").notNull().default(0),
+  createdAt: integer("created_at").notNull(),
+});
+
 export type InstanceRow = typeof instances.$inferSelect;
 export type NewInstanceRow = typeof instances.$inferInsert;
 export type SettingsRow = typeof settings.$inferSelect;
 export type DevtoolsDock = SettingsRow["devtoolsDock"];
+export type BookmarkRow = typeof bookmarks.$inferSelect;
+export type NewBookmarkRow = typeof bookmarks.$inferInsert;

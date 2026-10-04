@@ -19,5 +19,12 @@ export const migrations: { id: string; statements: string[] }[] = [
       "ALTER TABLE `instances` ADD `split_dir` text;",
       "ALTER TABLE `instances` ADD `parent_tty` text;"
     ]
+  },
+  {
+    "id": "0003_concerned_wonder_man",
+    "statements": [
+      "CREATE TABLE `bookmarks` (\n\t`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t`url` text NOT NULL,\n\t`title` text NOT NULL,\n\t`favicon` text,\n\t`pinned` integer DEFAULT false NOT NULL,\n\t`position` integer DEFAULT 0 NOT NULL,\n\t`created_at` integer NOT NULL\n);",
+      "CREATE UNIQUE INDEX `bookmarks_url_unique` ON `bookmarks` (`url`);"
+    ]
   }
 ];

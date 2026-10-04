@@ -14,9 +14,18 @@ export {
 } from "./paths";
 export { openStore, store } from "./client";
 export type { Store } from "./client";
-export { appState, instances, settings } from "./schema";
-export type { DevtoolsDock, InstanceRow, NewInstanceRow, SettingsRow } from "./schema";
+export { appState, bookmarks, instances, settings } from "./schema";
+export type { BookmarkRow, DevtoolsDock, InstanceRow, NewBookmarkRow, NewInstanceRow, SettingsRow } from "./schema";
 export { listInstances, removeInstance, upsertInstance } from "./instances";
+export {
+  addBookmark,
+  isBookmarked,
+  listBookmarks,
+  listPins,
+  removeBookmark,
+  seedDefaultPins,
+  setPinned,
+} from "./bookmarks";
 export {
   anonymousId,
   lastActiveDay,
