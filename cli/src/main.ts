@@ -27,6 +27,7 @@ import {
 import { findOwner } from "@zenbu-labs/pixel/terminal";
 import type { Direction, Terminal, TerminalCheck } from "@zenbu-labs/pixel/terminal";
 import { actionCommand } from "./action";
+import { bookmarkCommand } from "./bookmarks";
 import { control } from "./control";
 import { ensureSetup, setupCommand } from "./setup";
 import { commandHelp, helpTopics, rootHelp } from "./help";
@@ -723,6 +724,7 @@ async function main(): Promise<number> {
   if (command === "register-app") return registerAppCommand(args);
   if (command === "unregister-app") return unregisterAppCommand(args);
   if (command === "apps") return appsCommand(args);
+  if (command === "bookmark") return bookmarkCommand(args);
   if (command === "new-tab") {
     requirePaneAccess();
     const key = takeFlag(args, "--browser");

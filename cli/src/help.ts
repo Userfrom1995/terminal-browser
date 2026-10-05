@@ -90,6 +90,29 @@ using terminal-browser register-app. If an app is registered it can be opened th
 new tab command palette after searching for its name.
 `,
   },
+  bookmark: {
+    summary: "List, add, and remove bookmarks",
+    usage: "terminal-browser bookmark <ls|add|rm> [args]",
+    body: `
+Bookmarks live in the same SQLite store as the start page, so the CLI works
+with no browser running and both sides always agree.
+
+Commands:
+  ls [--json]                 List bookmarks with a pinned column
+  add <url> [title] [--pin|--unpin]
+                              Add a bookmark (same url twice updates the title,
+                              never duplicates); prints the created row
+  rm <id-or-url>              Remove a bookmark by id or url
+
+Examples:
+  terminal-browser bookmark ls
+  terminal-browser bookmark ls --json
+  terminal-browser bookmark add https://example.com Example --pin
+  terminal-browser bookmark add https://example.com "My Multi Word Title"
+  terminal-browser bookmark rm 12
+  terminal-browser bookmark rm https://example.com
+`,
+  },
   "register-app": {
     summary: "Register a terminal-browser application",
     usage: "terminal-browser register-app --name <name> --bin <path> [--id <id>] [--args \"…\"]",
