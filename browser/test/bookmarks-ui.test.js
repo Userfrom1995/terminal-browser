@@ -348,15 +348,15 @@ test("bookmark rows with non-http urls render inert without a clickable href", (
   assert.match(web, /href="https:\/\/example\.com"/);
 });
 
-test("pin tiles carry their digit badge", () => {
+test("pin tiles carry no digit badge; shortcuts stay keyboard-only", () => {
   const tile = pinTileHtml({ id: 1, url: "https://example.com", title: "Example" }, 2);
   assert.match(tile, /id="pin-3"/);
-  assert.match(tile, /<span class="pin-key" aria-hidden="true">3<\/span>/);
+  assert.doesNotMatch(tile, /pin-key/);
 });
 
-test("home polish: digit badges, filter hints, star copy, edit toggle, filter escape", () => {
+test("home polish: filter hints, star copy, edit toggle, filter escape", () => {
   const page = render(fakeData(), context({}));
-  assert.match(page, /<span class="pin-key" aria-hidden="true">1<\/span>/);
+  assert.doesNotMatch(page, /pin-key/);
   assert.match(page, /\/ search/);
   const noHero = render(fakeData(), context({ search: false }));
   assert.match(noHero, /\/ filter/);

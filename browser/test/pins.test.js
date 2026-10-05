@@ -33,7 +33,7 @@ test("pin tile renders favicon over a letter fallback with stable refs", () => {
   assert.match(tile, /<span class="pin-letter">G<\/span>/);
   assert.match(tile, /<img class="pin-favicon" src="https:\/\/github\.com\/favicon\.ico"/);
   assert.match(tile, /onerror="this\.remove\(\)"/);
-  assert.match(tile, /<span class="pin-key" aria-hidden="true">1<\/span>/);
+  assert.doesNotMatch(tile, /pin-key/);
   assert.match(tile, /data-delete-pin="12"/);
   assert.match(tile, /<span class="pin-host">github\.com<\/span>/);
 });

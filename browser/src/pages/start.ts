@@ -222,7 +222,6 @@ export function render(data: Awaited<ReturnType<typeof collectStartData>>, conte
   .pin-text { display: flex; flex-direction: column; min-width: 0; }
   .pin-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pin-host { color: ${muted}; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pin-key { margin-left: auto; flex: none; font-size: 10px; color: ${muted}; }
   .pin-delete { display: none; position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; border-radius: 50%; border: 1px solid ${hairline}; background: ${field}; color: ${fg}; font-size: 13px; line-height: 1; cursor: pointer; }
   body.editing-pins .pin-delete { display: block; }
   #pin-add-form { display: none; gap: 8px; margin-top: 10px; }
@@ -445,11 +444,10 @@ ${home.devSections ? (body || `<p class="empty">no running servers, no recent do
     const favicon = tileFavicon(pin.url);
     const img = favicon === null ? "" : '<img class="pin-favicon" src="' + escapeTile(favicon) + '" alt="" loading="lazy" onerror="this.remove()">';
     const label = escapeTile(pin.title);
-    const key = escapeTile(String(index + 1));
     const anchor = tileHttp(pin.url)
       ? '<a class="pin-link" id="pin-' + (index + 1) + '" data-pin-index="' + index + '" href="' + escapeTile(pin.url) + '">'
       : '<a class="pin-link" id="pin-' + (index + 1) + '" data-pin-index="' + index + '" aria-disabled="true">';
-    return '<div class="pin" data-pin-id="' + pin.id + '">' + anchor + '<span class="pin-tile" aria-hidden="true"><span class="pin-letter">' + letter + '</span>' + img + '</span><span class="pin-text"><span class="pin-label">' + label + '</span><span class="pin-host">' + host + '</span></span><span class="pin-key" aria-hidden="true">' + key + '</span></a><button class="pin-delete" type="button" data-pin-index="' + index + '" data-delete-pin="' + pin.id + '" aria-label="Delete ' + label + '" title="Delete ' + label + '">×</button></div>';
+    return '<div class="pin" data-pin-id="' + pin.id + '">' + anchor + '<span class="pin-tile" aria-hidden="true"><span class="pin-letter">' + letter + '</span>' + img + '</span><span class="pin-text"><span class="pin-label">' + label + '</span><span class="pin-host">' + host + '</span></span></a><button class="pin-delete" type="button" data-pin-index="' + index + '" data-delete-pin="' + pin.id + '" aria-label="Delete ' + label + '" title="Delete ' + label + '">×</button></div>';
   };
   // grid swaps never touch the search form, so typed input survives; focus
   // inside the grid returns to the exact focused element and scroll is kept

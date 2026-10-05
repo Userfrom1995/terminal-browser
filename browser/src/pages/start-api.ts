@@ -166,11 +166,10 @@ export function pinTileHtml(pin: PinTileData, index: number): string {
       ? ""
       : `<img class="pin-favicon" src="${escapeHtml(favicon)}" alt="" loading="lazy" onerror="this.remove()">`;
   const label = escapeHtml(pin.title);
-  const key = escapeHtml(String(index + 1));
   const link = isWebUrl(pin.url)
     ? `<a class="pin-link" id="pin-${index + 1}" data-pin-index="${index}" href="${escapeHtml(pin.url)}">`
     : `<a class="pin-link" id="pin-${index + 1}" data-pin-index="${index}" aria-disabled="true">`;
-  return `<div class="pin" data-pin-id="${pin.id}">${link}<span class="pin-tile" aria-hidden="true"><span class="pin-letter">${letter}</span>${img}</span><span class="pin-text"><span class="pin-label">${label}</span><span class="pin-host">${host}</span></span><span class="pin-key" aria-hidden="true">${key}</span></a><button class="pin-delete" type="button" data-pin-index="${index}" data-delete-pin="${pin.id}" aria-label="Delete ${label}" title="Delete ${label}">×</button></div>`;
+  return `<div class="pin" data-pin-id="${pin.id}">${link}<span class="pin-tile" aria-hidden="true"><span class="pin-letter">${letter}</span>${img}</span><span class="pin-text"><span class="pin-label">${label}</span><span class="pin-host">${host}</span></span></a><button class="pin-delete" type="button" data-pin-index="${index}" data-delete-pin="${pin.id}" aria-label="Delete ${label}" title="Delete ${label}">×</button></div>`;
 }
 
 export interface BookmarkRowData {
