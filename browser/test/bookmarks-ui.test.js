@@ -381,3 +381,8 @@ test("served inline page script parses as valid JavaScript", () => {
   assert.ok(bodies.length > 0, "expected at least one inline classic script");
   for (const [i, body] of bodies.entries()) new vm.Script(body, { filename: `start-page-${i}.js` });
 });
+
+test("suggestions fetch through the proxied endpoint, never the engine directly", () => {
+  assert.match(startBundle, /\/api\/suggest\?q=" \+ encodeURIComponent\(query\)/);
+  assert.doesNotMatch(startBundle, /fetch\(substitute\(suggestTemplate/);
+});

@@ -5,6 +5,7 @@ import { SEARCH_ENGINES, parseSuggestions } from "shared";
 export type StartRoute =
   | { kind: "page" }
   | { kind: "data" }
+  | { kind: "suggest"; query: string }
   | { kind: "bookmark-create" }
   | { kind: "bookmark-delete"; id: number }
   | { kind: "not-found" };
@@ -15,6 +16,7 @@ export function routeStartApi(method: string, url: URL): StartRoute {
   const pathname = url.pathname === "" ? "/" : url.pathname;
   if (method === "GET") {
     if (pathname === "/api/data" || url.searchParams.has("data")) return { kind: "data" };
+    if (pathname === "/api/suggest") return { kind: "suggest", query: url.searchParams.get("q") ?? "" };
     if (pathname === "/") return { kind: "page" };
     return { kind: "not-found" };
   }

@@ -21,6 +21,16 @@ test("start page and both data endpoints dispatch", () => {
   assert.deepEqual(route("GET", "terminal-browser://start/api/data?data"), { kind: "data" });
 });
 
+test("suggest endpoint dispatches with the decoded query", () => {
+  assert.deepEqual(route("GET", "terminal-browser://start/api/suggest?q=git"), {
+    kind: "suggest",
+    query: "git",
+  });
+  assert.deepEqual(route("GET", "terminal-browser://start/api/suggest?q="), { kind: "suggest", query: "" });
+  assert.deepEqual(route("GET", "terminal-browser://start/api/suggest"), { kind: "suggest", query: "" });
+  assert.deepEqual(route("POST", "terminal-browser://start/api/suggest?q=git"), { kind: "not-found" });
+});
+
 test("bookmark routes dispatch by method and path", () => {
   assert.deepEqual(route("POST", "terminal-browser://start/api/bookmark"), { kind: "bookmark-create" });
   assert.deepEqual(route("DELETE", "terminal-browser://start/api/bookmark/3"), {

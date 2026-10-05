@@ -3,11 +3,11 @@ import path from "node:path";
 
 import { protocol } from "electron";
 
-import { addBookmark, listBookmarks, removeBookmark, setPinned } from "shared";
+import { ConfigStore, SETTINGS_FILE, SHORTCUTS_FILE, SUGGESTIONS_OFF, addBookmark, listBookmarks, removeBookmark, setPinned } from "shared";
 
 import { renderMarkdown } from "./markdown";
 import { collectStartData, renderStartPage } from "./start";
-import { parseBookmarkBody, routeStartApi } from "./start-api";
+import { parseBookmarkBody, routeStartApi, suggestUrl } from "./start-api";
 import type { Theme } from "../ui/theme";
 
 
@@ -66,6 +66,17 @@ export function registerScheme() {
   ]);
 }
 
+function activeSuggestTemplate(): string | null {
+  try {
+    const settings = new ConfigStore({ settings: SETTINGS_FILE, shortcuts: SHORTCUTS_FILE }).load().settings;
+    const value = settings?.["search.suggestions"];
+    if (!value || value === SUGGESTIONS_OFF) return null;
+    return value;
+  } catch {
+    return null;
+  }
+}
+
 export function servePages(context: () => PageContext) {
   protocol.handle(SCHEME, async (request) => {
     const url = new URL(request.url);
@@ -76,6 +87,22 @@ export function servePages(context: () => PageContext) {
         return renderStartPage(url, context());
       case "data":
         return json(await collectStartData(context().cwd));
+      case "suggest": {
+        // Suggestions are proxied through the main process: engine endpoints
+        // don't send CORS headers, so page-side fetches are always blocked.
+        if (!route.query.trim()) return json({ error: "missing query" }, 400);
+        const upstream = suggestUrl(activeSuggestTemplate(), route.query);
+        if (!upstream) return json({ error: "suggestions off" }, 404);
+        try {
+          const response = await fetch(upstream, { signal: AbortSignal.timeout(3000) });
+          if (!response.ok) return json({ error: "suggestion fetch failed" }, 502);
+          return new Response(await response.text(), {
+            headers: { "content-type": "text/plain; charset=utf-8" },
+          });
+        } catch {
+          return json({ error: "suggestion fetch failed" }, 502);
+        }
+      }
       case "bookmark-create": {
         let body: unknown;
         try {

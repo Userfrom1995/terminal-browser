@@ -362,7 +362,7 @@ ${home.devSections ? (body || `<p class="empty">no running servers, no recent do
       const mine = ++seq;
       try {
         aborter = new AbortController();
-        const response = await fetch(substitute(suggestTemplate, query), {
+        const response = await fetch(apiBase + "/api/suggest?q=" + encodeURIComponent(query), {
           signal: AbortSignal.any([aborter.signal, AbortSignal.timeout(3000)]),
         });
         if (!response.ok || mine !== seq) return;
