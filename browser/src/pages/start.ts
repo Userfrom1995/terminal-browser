@@ -11,7 +11,7 @@ import { ConfigStore, SETTINGS_FILE, SHORTCUTS_FILE, engineBySearch, listBookmar
 import type { Theme } from "../ui/theme";
 import { documentUrl, escape, html, json, pageColors } from "./scheme";
 import type { PageContext } from "./scheme";
-import { bookmarkRowHtml, mapBookmarkRows, pinTileHtml, resolveSearchEngine } from "./start-api";
+import { bookmarkRowHtml, HOME_WEBMCP_TOOLS, mapBookmarkRows, pinTileHtml, resolveSearchEngine } from "./start-api";
 import type { BookmarkRowData } from "./start-api";
 
 
@@ -251,6 +251,7 @@ ${bookmarksSection}
 ${home.devSections ? (body || `<p class="empty">no running servers, no recent documents, no open pull request</p>`) : ""}
 <p class="hint" id="home-foot">prefer a blank page? set home.default to blank in settings</p>
 <div id="toast" role="status" hidden></div>
+<script id="home-tools" type="application/json" data-search-template="${escape(data.searchEngine)}">${JSON.stringify(HOME_WEBMCP_TOOLS).replace(/</g, "\\u003c")}</script>
 <script>
 (() => {
   const input = document.getElementById("search-input");
@@ -283,7 +284,7 @@ ${home.devSections ? (body || `<p class="empty">no running servers, no recent do
     const encoded = encodeURIComponent(query);
     return template.includes("%s") ? template.split("%s").join(encoded) : template + encoded;
   };
-  const resolve = (value) => {
+  const resolve = (value, template) => {
     const trimmed = value.trim();
     if (!trimmed) return "about:blank";
     if (hasAuthority.test(trimmed) || noHost.test(trimmed)) {
@@ -295,7 +296,7 @@ ${home.devSections ? (body || `<p class="empty">no running servers, no recent do
         try { return new URL(scheme + "://" + trimmed).toString(); } catch {}
       }
     }
-    return substitute(searchTemplate, trimmed);
+    return substitute(template === undefined ? searchTemplate : template, trimmed);
   };
   const go = (value, newTab) => {
     const url = resolve(value);
@@ -745,6 +746,141 @@ ${home.devSections ? (body || `<p class="empty">no running servers, no recent do
     }
     reloadSoon();
   }, 8000);
+  // WebMCP agent surface: specs come from HOME_WEBMCP_TOOLS in start-api.ts
+  // (script#home-tools above); execute closures reuse the same fetch paths
+  // as the UI (data()/apiBase/normalizePinHref), so tools and UI cannot
+  // drift. home.search returns the URL without navigating.
+  const toolsEl = document.getElementById("home-tools");
+  let homeTools = [];
+  try { const parsedTools = JSON.parse(toolsEl?.textContent || "[]"); homeTools = Array.isArray(parsedTools) ? parsedTools : []; } catch { homeTools = []; }
+  const toolTemplate = (toolsEl && toolsEl.dataset.searchTemplate) || searchTemplate;
+  const readRows = async () => {
+    const text = await data();
+    if (!text) return null;
+    try { return JSON.parse(text); } catch { return null; }
+  };
+  const refreshBoth = async () => { await refreshPins(); await refreshBookmarks(); };
+  const removeById = async (id) => {
+    if (!Number.isInteger(id)) return "Remove needs a bookmark id number.";
+    try {
+      const response = await fetch(apiBase + "/api/bookmark/" + encodeURIComponent(String(id)), { method: "DELETE" });
+      const text = await response.text();
+      if (!response.ok) return apiError(response.status);
+      await refreshBoth();
+      return text;
+    } catch { return apiError(0); }
+  };
+  // togglePlan mirrors bookmarkTogglePlan in start-api.ts — change both together
+  const togglePlan = (rows, url, title) => {
+    const trimmed = String(url).trim();
+    if (!trimmed) return null;
+    const existing = rows.find((row) => row.url === trimmed);
+    return existing
+      ? { action: "remove", id: existing.id }
+      : { action: "add", url: trimmed, title: String(title).trim() || trimmed };
+  };
+  // Agent surface is unconditional: executors and the eval bridge below must
+  // exist on every origin. Only WebMCP registration is capability-gated.
+  const executors = {
+      "home.search": async (args) => resolve(String(args.query ?? ""), toolTemplate),
+      "home.pin.list": async () => {
+        const parsed = await readRows();
+        return parsed && Array.isArray(parsed.pins) ? JSON.stringify(parsed.pins) : apiError(0);
+      },
+      "home.pin.add": async (args) => {
+        const url = normalizePinHref(args.url ?? "");
+        if (!url) return "Pins need a web address starting with http:// or https://.";
+        const label = String(args.label ?? "").trim() || tileHost(url) || url;
+        try {
+          const response = await fetch(apiBase + "/api/bookmark", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ url: url, title: label, pinned: true }),
+          });
+          const text = await response.text();
+          if (!response.ok) return apiError(response.status);
+          await refreshBoth();
+          return text;
+        } catch { return apiError(0); }
+      },
+      "home.pin.remove": async (args) => removeById(Number(args.id)),
+      "home.bookmark.list": async () => {
+        const parsed = await readRows();
+        return parsed && Array.isArray(parsed.bookmarks) ? JSON.stringify(parsed.bookmarks) : apiError(0);
+      },
+      "home.bookmark.add": async (args) => {
+        const url = String(args.url ?? "").trim();
+        if (!url) return "That entry needs a title and a valid web address.";
+        const title = String(args.title ?? "").trim() || url;
+        try {
+          const response = await fetch(apiBase + "/api/bookmark", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ url: url, title: title }),
+          });
+          const text = await response.text();
+          if (!response.ok) return apiError(response.status);
+          await refreshBoth();
+          return text;
+        } catch { return apiError(0); }
+      },
+      "home.bookmark.remove": async (args) => removeById(Number(args.id)),
+      "home.bookmark.toggle": async (args) => {
+        const parsed = await readRows();
+        if (!parsed || !Array.isArray(parsed.bookmarks)) return apiError(0);
+        const plan = togglePlan(parsed.bookmarks, args.url ?? "", args.title ?? "");
+        if (!plan) return "That entry needs a title and a valid web address.";
+        if (plan.action === "remove") return removeById(plan.id);
+        try {
+          const response = await fetch(apiBase + "/api/bookmark", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ url: plan.url, title: plan.title }),
+          });
+          const text = await response.text();
+          if (!response.ok) return apiError(response.status);
+          await refreshBoth();
+          return text;
+        } catch { return apiError(0); }
+      },
+    };
+    // Eval bridge for agents: Chromium rejects modelContext tool hosting on
+    // non-web origins (terminal-browser://, file:// fail with SecurityError
+    // while https:// works), so the same executors stay reachable by name
+    // here. Agents call window.__homeTools.invoke(name, paramsJson) through
+    // eval; results are always strings and failures are plain sentences.
+    window.__homeTools = {
+      list: () => JSON.stringify(homeTools.map((spec) => ({ name: spec.name, title: spec.title, description: spec.description, inputSchema: spec.inputSchema }))),
+      invoke: (name, paramsJson) => {
+        const run = executors[name];
+        if (!run) return Promise.resolve("Unknown tool: " + String(name) + ".");
+        let args = {};
+        try { args = JSON.parse(paramsJson || "{}") || {}; } catch { return Promise.resolve("Parameters must be valid JSON."); }
+        return run(args).catch(() => apiError(0));
+      },
+    };
+    // Progressive enhancement: register with the platform only where the
+    // capability read succeeds. The eval bridge above stays the primary
+    // channel on origins where Chromium rejects modelContext use.
+    let mc = null;
+    try { mc = document.modelContext; } catch {}
+    if (mc) {
+    for (const spec of homeTools) {
+      const run = executors[spec.name];
+      if (!run) continue;
+      try {
+        const registered = mc.registerTool({
+          name: spec.name,
+          title: spec.title,
+          description: spec.description,
+          inputSchema: spec.inputSchema,
+          annotations: spec.annotations,
+          execute: (input) => run(input || {}).catch(() => apiError(0)),
+        });
+        if (registered && typeof registered.catch === "function") registered.catch(() => {});
+      } catch {}
+    }
+    }
 })();
 </script>
 </body></html>`;

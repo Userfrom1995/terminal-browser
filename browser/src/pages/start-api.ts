@@ -284,3 +284,131 @@ export function pinAddPayload(url: string, label: string): { url: string; title:
   if (!normalized) return null;
   return { url: normalized, title: label.trim() || pinHost(normalized) || normalized, pinned: true };
 }
+
+export interface HomeToolInputSchema {
+  type: "object";
+  properties: Record<string, unknown>;
+  required?: string[];
+}
+
+export interface HomeToolSpec {
+  name: string;
+  title: string;
+  description: string;
+  inputSchema: HomeToolInputSchema;
+  annotations?: { readOnlyHint?: boolean };
+}
+
+// Single source of truth for the start-page WebMCP surface: start.ts embeds
+// this array into the served page (script#home-tools) and registers each
+// entry via document.modelContext, so tests import it from dist and assert
+// the served page advertises exactly this set.
+export const HOME_WEBMCP_TOOLS: HomeToolSpec[] = [
+  {
+    name: "home.search",
+    title: "Resolve search or URL",
+    description:
+      "Resolve a search query or URL to the address the start page would open, without navigating. Returns the URL string.",
+    inputSchema: {
+      type: "object",
+      properties: { query: { type: "string", description: "Search text or URL, as typed in the start-page search box." } },
+      required: ["query"],
+    },
+    annotations: { readOnlyHint: true },
+  },
+  {
+    name: "home.pin.list",
+    title: "List pins",
+    description: "List pinned sites. Returns the same pin rows the start-page grid renders.",
+    inputSchema: { type: "object", properties: {} },
+    annotations: { readOnlyHint: true },
+  },
+  {
+    name: "home.pin.add",
+    title: "Add pin",
+    description: "Pin a site to the start-page grid. Returns the created row.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "Web address to pin; bare hosts gain https, non-http(s) is rejected." },
+        label: { type: "string", description: "Tile label; defaults to the URL host." },
+      },
+      required: ["url"],
+    },
+  },
+  {
+    name: "home.pin.remove",
+    title: "Remove pin",
+    description: "Remove a pin by id. Returns the deletion result.",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "integer", description: "Pin id from home.pin.list." } },
+      required: ["id"],
+    },
+  },
+  {
+    name: "home.bookmark.list",
+    title: "List bookmarks",
+    description: "List bookmarks. Returns the same rows the start-page manager renders.",
+    inputSchema: { type: "object", properties: {} },
+    annotations: { readOnlyHint: true },
+  },
+  {
+    name: "home.bookmark.add",
+    title: "Add bookmark",
+    description: "Bookmark a URL. POST is idempotent: the same URL twice updates, never duplicates. Returns the row.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "URL to bookmark." },
+        title: { type: "string", description: "Bookmark title; defaults to the URL." },
+      },
+      required: ["url"],
+    },
+  },
+  {
+    name: "home.bookmark.remove",
+    title: "Remove bookmark",
+    description: "Remove a bookmark by id. A missing id reports already-deleted, never an error. Returns the result.",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "integer", description: "Bookmark id from home.bookmark.list." } },
+      required: ["id"],
+    },
+  },
+  {
+    name: "home.bookmark.toggle",
+    title: "Toggle bookmark",
+    description:
+      "Flip a bookmark by URL: removes it when the exact URL is bookmarked, adds it otherwise. Returns the outcome.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "URL to toggle; must match a listed URL exactly to remove." },
+        title: { type: "string", description: "Title used when adding; defaults to the URL." },
+      },
+      required: ["url"],
+    },
+  },
+];
+
+export function homeToolNames(): string[] {
+  return HOME_WEBMCP_TOOLS.map((tool) => tool.name);
+}
+
+export type BookmarkTogglePlan = { action: "remove"; id: number } | { action: "add"; url: string; title: string };
+
+// Pure half of home.bookmark.toggle: the page resolves the plan from fresh
+// /api/data rows, then performs the single DELETE or POST. Empty URLs are
+// rejected so the tool answers instead of storing a blank row.
+export function bookmarkTogglePlan(
+  rows: { id: number; url: string }[],
+  url: string,
+  title: string,
+): BookmarkTogglePlan | null {
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  const existing = rows.find((row) => row.url === trimmed);
+  if (existing) return { action: "remove", id: existing.id };
+  return { action: "add", url: trimmed, title: title.trim() || trimmed };
+}
