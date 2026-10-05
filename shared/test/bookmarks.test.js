@@ -143,6 +143,22 @@ test("seedDefaultPins seeds three pins once and never overwrites", async () => {
   }
 });
 
+test("listPins breaks position ties by id", async () => {
+  const { scope, cleanup } = tempScope();
+  try {
+    const a = await addBookmark({ url: "https://a.example", title: "A" }, scope);
+    const b = await addBookmark({ url: "https://b.example", title: "B" }, scope);
+    await setPinned(a.id, true, { ...scope, position: 0 });
+    await setPinned(b.id, true, { ...scope, position: 0 });
+    assert.deepEqual(
+      (await listPins(scope)).map((row) => row.url),
+      ["https://a.example", "https://b.example"],
+    );
+  } finally {
+    cleanup();
+  }
+});
+
 test("removeBookmark and setPinned on missing ids are no-ops", async () => {
   const { scope, cleanup } = tempScope();
   try {

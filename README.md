@@ -66,6 +66,36 @@ terminal-browser upgrade # upgrade to the latest version
 | Start element selection (send to agent) | ctrl+g | ctrl+g |
 | Close popup / overlay | escape | escape |
 
+### Home page (`terminal-browser://start`)
+
+New tabs open on a home page: focused search box, pinned sites, bookmarks,
+and developer context (local servers, recent documents, open pull request).
+First run seeds starter pins (GitHub, MDN Web Docs, Reddit) — press `e` to
+edit or remove them.
+
+| Keys | Action |
+| --- | --- |
+| `/` | Focus search (or the bookmarks filter when search is hidden) |
+| `1`–`8` (`Shift` = new tab) | Open pinned site |
+| `e` | Edit pins (`Esc` exits) |
+| `Enter` / `Alt+Enter` | Search or open URL here / in a new tab |
+| `Esc` | Close suggestions, clear filter, or exit pin editing (`Esc` on an empty filter leaves the field) |
+| `Ctrl+D` / `Cmd+D`, or the star in the address bar | Bookmark the current tab |
+
+Manage bookmarks from any shell, with no browser running:
+
+```
+terminal-browser bookmark ls
+terminal-browser bookmark add https://example.com "Example" --pin
+terminal-browser bookmark rm https://example.com
+```
+
+Prefer a blank page? `terminal-browser config set home.default blank`
+(`TERMINAL_BROWSER_START_PAGE=0` for a single launch). Toggle sections with
+`home.search`, `home.pins`, `home.bookmarks`, `home.devSections`.
+Agents: the page also exposes `home.*` tools — see the skill's home-page
+notes for the eval-bridge contract and copy-paste snippets.
+
 
 
 ### How does it work?

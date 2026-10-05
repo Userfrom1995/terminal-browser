@@ -24,7 +24,7 @@ export async function listPins(scope?: BookmarkScope): Promise<BookmarkRow[]> {
     .select()
     .from(bookmarks)
     .where(eq(bookmarks.pinned, true))
-    .orderBy(asc(bookmarks.position));
+    .orderBy(asc(bookmarks.position), asc(bookmarks.id));
 }
 
 export async function addBookmark(

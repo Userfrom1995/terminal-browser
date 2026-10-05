@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 
 import { z } from "zod";
 
-import { ConfigStore, SETTINGS_FILE, SHORTCUTS_FILE, engineBySearch, listBookmarks, listPins } from "shared";
+import { ConfigStore, SETTINGS_FILE, SHORTCUTS_FILE, engineBySearch, listBookmarks, listPins, seedDefaultPins } from "shared";
 
 import type { Theme } from "../ui/theme";
 import { documentUrl, escape, html, json, pageColors } from "./scheme";
@@ -43,6 +43,8 @@ export async function renderStartPage(url: URL, context: PageContext): Promise<R
 }
 
 export async function collectStartData(cwd: string) {
+  // First run seeds the default pins; the guard inside is a no-op afterwards.
+  await seedDefaultPins().catch(() => []);
   const [ports, documents, pr, pins, bookmarks] = await Promise.all([
     listeningPorts(),
     recentDocuments(cwd),
@@ -152,7 +154,7 @@ export function render(data: Awaited<ReturnType<typeof collectStartData>>, conte
   const hero = home.search ? `<header class="hero">
 <h1><span class="prompt">&gt;_</span> terminal-browser</h1>
 <form id="search-form" role="search"><input id="search-input" name="q" type="search" autofocus autocomplete="off" spellcheck="false" placeholder="Search or enter URL..." aria-label="Search or enter URL" data-search-template="${escape(data.searchEngine)}"${suggest ? ` data-suggest-template="${escape(suggest)}"` : ""}><ul id="search-suggest" role="listbox" aria-label="Search suggestions" hidden></ul></form>
-<p class="hint">Enter opens here · Alt+Enter opens a new tab</p>
+<p class="hint">Enter opens here · Alt+Enter opens a new tab · / focuses search</p>
 </header>` : "";
   const gridPins = data.pins.slice(0, MAX_PINS);
   const pinsSection = home.pins ? `<section aria-label="Pinned sites" id="pins">
@@ -165,9 +167,9 @@ export function render(data: Awaited<ReturnType<typeof collectStartData>>, conte
   const now = Date.now();
   const bookmarkRows: BookmarkRowData[] = mapBookmarkRows(data.bookmarks, now);
   const bookmarksSection = home.bookmarks ? `<section aria-label="Bookmarks" id="bookmarks">
-<div class="bookmarks-head"><h2>BOOKMARKS</h2><div class="bookmarks-tools">${home.search ? "" : '<span class="hint">/ filter</span>'}<input id="bookmarks-filter" type="search" autocomplete="off" spellcheck="false" placeholder="Filter bookmarks..." aria-label="Filter bookmarks"></div></div>
+<div class="bookmarks-head"><h2>BOOKMARKS</h2><div class="bookmarks-tools">${home.search ? '<span class="hint">/ search</span>' : '<span class="hint">/ filter</span>'}<input id="bookmarks-filter" type="search" autocomplete="off" spellcheck="false" placeholder="Filter bookmarks..." aria-label="Filter bookmarks"></div></div>
 <ul id="bookmarks-list">${bookmarkRows.map((bookmark) => bookmarkRowHtml(bookmark)).join("")}</ul>
-<p class="empty" id="bookmarks-empty"${bookmarkRows.length > 0 ? " hidden" : ""}>no bookmarks yet — on any page, press Ctrl+D (Mac: &#8984;D) to save it here</p>
+<p class="empty" id="bookmarks-empty"${bookmarkRows.length > 0 ? " hidden" : ""}>no bookmarks yet — on any page, press Ctrl+D (Mac: &#8984;D) or click the star in the address bar to save it here</p>
 <script id="bookmarks-data" type="application/json">${JSON.stringify(bookmarkRows).replace(/</g, "\\u003c")}</script>
 </section>` : "";
   const body = home.devSections
@@ -220,6 +222,7 @@ export function render(data: Awaited<ReturnType<typeof collectStartData>>, conte
   .pin-text { display: flex; flex-direction: column; min-width: 0; }
   .pin-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pin-host { color: ${muted}; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pin-key { margin-left: auto; flex: none; font-size: 10px; color: ${muted}; }
   .pin-delete { display: none; position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; border-radius: 50%; border: 1px solid ${hairline}; background: ${field}; color: ${fg}; font-size: 13px; line-height: 1; cursor: pointer; }
   body.editing-pins .pin-delete { display: block; }
   #pin-add-form { display: none; gap: 8px; margin-top: 10px; }
@@ -442,10 +445,11 @@ ${home.devSections ? (body || `<p class="empty">no running servers, no recent do
     const favicon = tileFavicon(pin.url);
     const img = favicon === null ? "" : '<img class="pin-favicon" src="' + escapeTile(favicon) + '" alt="" loading="lazy" onerror="this.remove()">';
     const label = escapeTile(pin.title);
+    const key = escapeTile(String(index + 1));
     const anchor = tileHttp(pin.url)
       ? '<a class="pin-link" id="pin-' + (index + 1) + '" data-pin-index="' + index + '" href="' + escapeTile(pin.url) + '">'
       : '<a class="pin-link" id="pin-' + (index + 1) + '" data-pin-index="' + index + '" aria-disabled="true">';
-    return '<div class="pin" data-pin-id="' + pin.id + '">' + anchor + '<span class="pin-tile" aria-hidden="true"><span class="pin-letter">' + letter + '</span>' + img + '</span><span class="pin-text"><span class="pin-label">' + label + '</span><span class="pin-host">' + host + '</span></span></a><button class="pin-delete" type="button" data-pin-index="' + index + '" data-delete-pin="' + pin.id + '" aria-label="Delete ' + label + '" title="Delete ' + label + '">×</button></div>';
+    return '<div class="pin" data-pin-id="' + pin.id + '">' + anchor + '<span class="pin-tile" aria-hidden="true"><span class="pin-letter">' + letter + '</span>' + img + '</span><span class="pin-text"><span class="pin-label">' + label + '</span><span class="pin-host">' + host + '</span></span><span class="pin-key" aria-hidden="true">' + key + '</span></a><button class="pin-delete" type="button" data-pin-index="' + index + '" data-delete-pin="' + pin.id + '" aria-label="Delete ' + label + '" title="Delete ' + label + '">×</button></div>';
   };
   // grid swaps never touch the search form, so typed input survives; focus
   // inside the grid returns to the exact focused element and scroll is kept
@@ -482,6 +486,8 @@ ${home.devSections ? (body || `<p class="empty">no running servers, no recent do
     if (!editToggle) return;
     document.body.classList.toggle("editing-pins", on);
     editToggle.setAttribute("aria-pressed", on ? "true" : "false");
+    editToggle.textContent = on ? "[e] done" : "[e] edit";
+    editToggle.title = on ? "Done editing pins (e or Esc)" : "Edit pins (e)";
     if (on && pinUrlInput) pinUrlInput.focus();
     else editToggle.focus();
     maybeReload();
@@ -613,7 +619,11 @@ ${home.devSections ? (body || `<p class="empty">no running servers, no recent do
   };
   bookmarksFilter?.addEventListener("input", applyBookmarkFilter);
   bookmarksFilter?.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
+    if (event.key !== "Escape") return;
+    // Mirrors bookmarkFilterEscape in start-api.ts — change both together:
+    // first Escape clears the filter, Escape on an empty filter leaves it.
+    if (bookmarksFilter.value === "") bookmarksFilter.blur();
+    else {
       bookmarksFilter.value = "";
       applyBookmarkFilter();
     }

@@ -166,10 +166,11 @@ export function pinTileHtml(pin: PinTileData, index: number): string {
       ? ""
       : `<img class="pin-favicon" src="${escapeHtml(favicon)}" alt="" loading="lazy" onerror="this.remove()">`;
   const label = escapeHtml(pin.title);
+  const key = escapeHtml(String(index + 1));
   const link = isWebUrl(pin.url)
     ? `<a class="pin-link" id="pin-${index + 1}" data-pin-index="${index}" href="${escapeHtml(pin.url)}">`
     : `<a class="pin-link" id="pin-${index + 1}" data-pin-index="${index}" aria-disabled="true">`;
-  return `<div class="pin" data-pin-id="${pin.id}">${link}<span class="pin-tile" aria-hidden="true"><span class="pin-letter">${letter}</span>${img}</span><span class="pin-text"><span class="pin-label">${label}</span><span class="pin-host">${host}</span></span></a><button class="pin-delete" type="button" data-pin-index="${index}" data-delete-pin="${pin.id}" aria-label="Delete ${label}" title="Delete ${label}">×</button></div>`;
+  return `<div class="pin" data-pin-id="${pin.id}">${link}<span class="pin-tile" aria-hidden="true"><span class="pin-letter">${letter}</span>${img}</span><span class="pin-text"><span class="pin-label">${label}</span><span class="pin-host">${host}</span></span><span class="pin-key" aria-hidden="true">${key}</span></a><button class="pin-delete" type="button" data-pin-index="${index}" data-delete-pin="${pin.id}" aria-label="Delete ${label}" title="Delete ${label}">×</button></div>`;
 }
 
 export interface BookmarkRowData {
@@ -277,6 +278,13 @@ export function dispatchGridKey(
   if (key) return { kind: "open-pin", index: Number(key[0]) - 1, newTab: event.shiftKey };
   if (event.key.toLowerCase() === "e") return { kind: "toggle-edit" };
   return { kind: "ignore" };
+}
+
+// Pure half of the bookmarks-filter Escape behavior: the first Escape clears
+// a non-empty filter, Escape on an empty filter leaves the field (blur). The
+// page mirrors this order in start.ts — change both together.
+export function bookmarkFilterEscape(value: string): "clear" | "blur" {
+  return value.length === 0 ? "blur" : "clear";
 }
 
 export function pinAddPayload(url: string, label: string): { url: string; title: string; pinned: true } | null {

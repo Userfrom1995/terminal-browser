@@ -33,4 +33,38 @@ does not break when the layout changes. Tools can carry annotations. Treat
 `readOnly: false` as a change to the user's data and `consequential: true` as
 something to confirm with the user before invoking.
 
+## Home page agent surface (`terminal-browser://start`)
+
+The home page lists pins and bookmarks and resolves search without
+navigating. Prefer tools over snapshot/click when they cover the task.
+
+Agent contract (eval bridge — the primary channel):
+`window.__homeTools.list()` → specs JSON; `invoke(name, paramsJson)` →
+string; unknown/malformed → plain sentences, never throws.
+
+```sh
+terminal-browser action -- eval "window.__homeTools.list()"
+terminal-browser action -- eval "window.__homeTools.invoke('home.search', JSON.stringify({query:'github.com'}))"
+terminal-browser action -- eval "window.__homeTools.invoke('home.pin.list', '{}')"
+terminal-browser action -- eval "window.__homeTools.invoke('home.pin.add', JSON.stringify({url:'example.com', label:'Example'}))"
+terminal-browser action -- eval "window.__homeTools.invoke('home.pin.remove', JSON.stringify({id: 12}))"
+terminal-browser action -- eval "window.__homeTools.invoke('home.bookmark.add', JSON.stringify({url:'https://example.com/docs', title:'Docs'}))"
+terminal-browser action -- eval "window.__homeTools.invoke('home.bookmark.toggle', JSON.stringify({url:'https://example.com/docs'}))"
+```
+
+Rows are JSON with `id`, `url`, `title`; pins and bookmarks share one id
+space. List first, then remove by id: `invoke('home.bookmark.list','{}')`
+→ `invoke('home.bookmark.remove', '{"id": 12}')`. Toggle removes on an
+exact-URL match and adds otherwise (an empty title falls back to the URL).
+`home.search` returns the URL without navigating (e.g. `github.com` →
+`"https://github.com/"`).
+
+Platform note: `webmcp list` is empty on `terminal-browser://` — expected
+Chromium behavior on non-web origins, not a bug. The eval bridge above is
+the primary channel; the page's `registerTool` calls are progressive
+enhancement for origins where Chromium allows them.
+
+Shell parity with no browser running: `terminal-browser bookmark ls/add/rm`
+reads the same SQLite store the page reads, so both sides always agree.
+
 ## Command reference
