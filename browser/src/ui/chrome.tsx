@@ -42,7 +42,6 @@ export function Chrome({
   actions,
   layout,
   colors,
-  font,
   findOpen,
   palette,
   tabs,
@@ -67,7 +66,6 @@ export function Chrome({
   actions: ChromeActions;
   layout: ChromeLayout;
   colors: EngineInfo["colors"];
-  font: number;
   findOpen: boolean;
   palette: PaletteView | null;
   tabs: TabRow[];
@@ -101,7 +99,6 @@ export function Chrome({
         background: theme.bg,
         color: theme.fg,
         fontSize: layout.rem,
-        font,
       }}
     >
       {layout.toolbarHeight > 0 &&
